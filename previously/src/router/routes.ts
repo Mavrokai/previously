@@ -8,6 +8,18 @@ const routes: RouteRecordRaw[] = [
   },
 
   {
+    path: '/series',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{ path: '', component: () => import('pages/SeriesPage.vue') }],
+  },
+
+  {
+    path: '/movies',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{ path: '', component: () => import('pages/MoviesPage.vue') }],
+  },
+
+  {
     path: '/auth/callback',
     component: () => import('layouts/MainLayout.vue'),
     children: [{ path: '', component: () => import('pages/AuthCallback.vue') }],

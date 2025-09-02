@@ -4,6 +4,11 @@
       <q-toolbar>
         <q-toolbar-title class="text-primary text-weight-bold"> Previously </q-toolbar-title>
 
+        <div class="q-ml-md">
+          <q-btn flat label="Séries" icon="tv" to="/series" class="text-primary" />
+          <q-btn flat label="Films" icon="movie" to="/movies" class="text-primary" />
+        </div>
+
         <div class="q-ml-auto">
           <q-btn-dropdown v-if="authStore.isAuthenticated" flat no-caps class="text-primary">
             <template v-slot:label>
