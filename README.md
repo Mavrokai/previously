@@ -37,7 +37,7 @@ npm --version
 1. **Cloner le repository**
 
 ```bash
-git clone <git@github.com:EpitechWebAcademiePromo2026/W-SPE-502-LIL-2-1-previously-valentin.verscheure.git>
+git clone "git@github.com:EpitechWebAcademiePromo2026/W-SPE-502-LIL-2-1-previously-valentin.verscheure.git"
 cd previously
 ```
 
