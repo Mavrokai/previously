@@ -43,7 +43,7 @@ export default defineConfig((/* ctx */) => {
         // extendTsConfig (tsConfig) {}
       },
 
-      vueRouterMode: 'hash', // available values: 'hash', 'history'
+      vueRouterMode: 'history', // available values: 'hash', 'history'
       // vueRouterBase,
       // vueDevtools,
       // vueOptionsAPI: false,
@@ -59,7 +59,16 @@ export default defineConfig((/* ctx */) => {
       // polyfillModulePreload: true,
       // distDir
 
-      // extendViteConf (viteConf) {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      extendViteConf(viteConf: any) {
+        if (viteConf.resolve) {
+          viteConf.resolve.alias = {
+            ...viteConf.resolve.alias,
+            src: '/src',
+            '@': '/src',
+          };
+        }
+      },
       // viteVuePluginOptions: {},
 
       vitePlugins: [

@@ -7,6 +7,12 @@ const routes: RouteRecordRaw[] = [
     children: [{ path: '', component: () => import('pages/IndexPage.vue') }],
   },
 
+  {
+    path: '/auth/callback',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{ path: '', component: () => import('pages/AuthCallback.vue') }],
+  },
+
   // Always leave this as last one,
   // but you can also remove it
   {
