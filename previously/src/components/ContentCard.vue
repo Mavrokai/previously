@@ -1,5 +1,5 @@
 <template>
-  <q-card class="content-card" elevated>
+  <q-card class="content-card" elevated @click="onCardClick">
     <div class="card-image-container">
       <img
         v-if="image"
@@ -39,6 +39,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 interface Props {
   title: string;
@@ -47,16 +48,26 @@ interface Props {
   genre?: string | undefined;
   description?: string | undefined;
   icon?: string | undefined;
+  id?: string | undefined;
+  type?: 'movie' | 'show' | undefined;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   icon: 'movie',
 });
 
+const router = useRouter();
 const imageError = ref(false);
 
 const onImageError = () => {
   imageError.value = true;
+};
+
+const onCardClick = () => {
+  if (props.id && props.type) {
+    const route = props.type === 'movie' ? `/movie/${props.id}` : `/show/${props.id}`;
+    void router.push(route);
+  }
 };
 </script>
 
@@ -74,6 +85,7 @@ export default {
     transform 0.2s ease,
     box-shadow 0.2s ease;
   overflow: hidden;
+  cursor: pointer;
 
   &:hover {
     transform: translateY(-4px);

@@ -20,6 +20,18 @@ const routes: RouteRecordRaw[] = [
   },
 
   {
+    path: '/movie/:id',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{ path: '', component: () => import('pages/MovieDetailPage.vue') }],
+  },
+
+  {
+    path: '/show/:id',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{ path: '', component: () => import('pages/ShowDetailPage.vue') }],
+  },
+
+  {
     path: '/auth/callback',
     component: () => import('layouts/MainLayout.vue'),
     children: [{ path: '', component: () => import('pages/AuthCallback.vue') }],

@@ -52,6 +52,8 @@
             :image="show.poster || show.images?.poster || undefined"
             :rating="show.notes?.mean || undefined"
             :genre="getMainGenre(show.genres) || 'Série'"
+            :id="show.id"
+            type="show"
             icon="tv"
           />
         </div>
@@ -172,30 +174,6 @@ const getMainGenre = (genres?: string[] | Record<string, string>): string => {
   }
 
   if (genresArray.length === 0) return '';
-
-  const priorityOrder = [
-    'Science-fiction',
-    'Fantastique',
-    'Horreur',
-    'Thriller',
-    'Mystère',
-    'Crime',
-    'Action',
-    'Comédie',
-    'Romance',
-    'Drame',
-    'Animation',
-    'Mini-série',
-    'Documentaire',
-    'Reality',
-    'Talk-show',
-  ];
-
-  for (const priorityGenre of priorityOrder) {
-    if (genresArray.includes(priorityGenre)) {
-      return priorityGenre;
-    }
-  }
 
   return genresArray[0] || '';
 };

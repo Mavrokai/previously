@@ -46,6 +46,8 @@
               ...(movie.notes?.mean && { rating: movie.notes.mean }),
               ...(getMainGenre(movie.genres) && { genre: getMainGenre(movie.genres) }),
               ...(!getMainGenre(movie.genres) && { genre: 'Film' }),
+              id: movie.id,
+              type: 'movie',
             }"
             icon="movie"
           />
@@ -177,30 +179,6 @@ const getMainGenre = (genres?: string[] | Record<string, string>): string => {
   }
 
   if (genresArray.length === 0) return '';
-
-  const priorityOrder = [
-    'Science-fiction',
-    'Fantastique',
-    'Horreur',
-    'Thriller',
-    'Mystère',
-    'Crime',
-    'Action',
-    'Comédie',
-    'Romance',
-    'Drame',
-    'Animation',
-    'Documentaire',
-    'Biographie',
-    'Guerre',
-    'Western',
-  ];
-
-  for (const priorityGenre of priorityOrder) {
-    if (genresArray.includes(priorityGenre)) {
-      return priorityGenre;
-    }
-  }
 
   return genresArray[0] || '';
 };
