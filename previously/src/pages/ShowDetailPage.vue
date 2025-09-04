@@ -6,7 +6,82 @@
     </div>
 
     <div v-else-if="show" class="page-wrapper">
-      <div class="back-button-container">
+      <div v-if="show.backdrop || show.images?.banner" class="show-banner">
+        <div
+          class="banner-backdrop"
+          :style="{ backgroundImage: `url(${show.backdrop || show.images?.banner})` }"
+        ></div>
+        <div class="banner-overlay"></div>
+        <div class="banner-content">
+          <div class="back-button-container">
+            <q-btn
+              flat
+              icon="arrow_back"
+              label="Revenir aux Séries"
+              color="white"
+              @click="$router.push('/series')"
+              class="text-weight-medium back-button"
+            />
+          </div>
+
+          <div class="banner-show-info">
+            <div class="banner-poster-container">
+              <img
+                v-if="show.poster || show.images?.poster"
+                :src="show.poster || show.images?.poster || ''"
+                :alt="show.title"
+                class="banner-poster"
+                @error="onImageError"
+              />
+            </div>
+            <div class="banner-text-content">
+              <h1 class="banner-title">{{ show.title }}</h1>
+              <div v-if="show.creation" class="banner-year">({{ show.creation }})</div>
+              <div v-if="show.notes?.mean" class="banner-rating">
+                <q-icon name="star" size="1.2rem" color="amber" />
+                <span class="rating-text">{{ show.notes.mean.toFixed(1) }}/10</span>
+                <span class="rating-count">({{ show.notes.total }} avis)</span>
+              </div>
+
+              <div v-if="show.genres" class="banner-genres">
+                <div
+                  v-for="genre in getGenresArray(show.genres)"
+                  :key="genre"
+                  :class="`genre-chip genre-${getGenreClass(genre)}`"
+                >
+                  {{ genre }}
+                </div>
+              </div>
+
+              <div v-if="show.length || show.language" class="banner-details">
+                <div v-if="show.length" class="banner-detail-item">
+                  <q-icon
+                    name="schedule"
+                    size="1rem"
+                    color="rgba(255, 255, 255, 0.9)"
+                    class="q-mr-xs"
+                  />
+                  <span class="banner-detail-label">Durée Moyenne d'un épisode :</span>
+                  <span class="banner-detail-value">{{ formatDuration(show.length) }}</span>
+                </div>
+
+                <div v-if="show.language" class="banner-detail-item">
+                  <q-icon
+                    name="language"
+                    size="1rem"
+                    color="rgba(255, 255, 255, 0.9)"
+                    class="q-mr-xs"
+                  />
+                  <span class="banner-detail-label">Langue :</span>
+                  <span class="banner-detail-value">{{ show.language }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="back-button-container">
         <q-btn
           flat
           icon="arrow_back"
@@ -16,354 +91,300 @@
           class="text-weight-medium back-button"
         />
       </div>
-      <div class="show-detail-container">
-        <div class="show-poster-section">
-          <div class="show-poster-container">
+
+      <div v-if="!show.backdrop && !show.images?.banner" class="show-info-header">
+        <div class="show-info-header-content">
+          <div class="show-poster-section">
             <img
               v-if="show.poster || show.images?.poster"
               :src="show.poster || show.images?.poster || ''"
               :alt="show.title"
-              class="show-poster"
+              class="show-poster-large"
               @error="onImageError"
             />
-            <img
-              v-else-if="show.id"
-              :src="getShowImageUrl(show.id)"
-              :alt="show.title"
-              class="show-poster"
-              @error="onImageError"
-            />
-            <div v-else class="show-poster-placeholder">
-              <q-icon name="tv" size="4rem" color="grey-5" />
+          </div>
+          <div class="show-info-text">
+            <h1 class="show-title">{{ show.title }}</h1>
+            <div v-if="show.creation" class="show-year">({{ show.creation }})</div>
+            <div v-if="show.notes?.mean" class="show-rating">
+              <q-icon name="star" size="1.2rem" color="amber" />
+              <span class="rating-text">{{ show.notes.mean.toFixed(1) }}/10</span>
+              <span class="rating-count">({{ show.notes.total }} avis)</span>
+            </div>
+
+            <div v-if="show.genres" class="show-genres">
+              <div
+                v-for="genre in getGenresArray(show.genres)"
+                :key="genre"
+                :class="`genre-chip genre-${getGenreClass(genre)}`"
+              >
+                {{ genre }}
+              </div>
+            </div>
+
+            <div v-if="show.length || show.language" class="show-details-row">
+              <div v-if="show.length" class="detail-item">
+                <q-icon name="schedule" color="primary" class="q-mr-sm" />
+                <span class="text-weight-medium">Durée Moyenne d'un épisode :</span>
+                <span class="q-ml-sm">{{ formatDuration(show.length) }}</span>
+              </div>
+
+              <div v-if="show.language" class="detail-item">
+                <q-icon name="language" color="primary" class="q-mr-sm" />
+                <span class="text-weight-medium">Langue :</span>
+                <span class="q-ml-sm">{{ show.language }}</span>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="show-info-section">
-          <div class="show-info">
-            <div class="text-h3 text-weight-bold text-primary q-mb-md">
-              {{ show.title }}
-              <span v-if="show.release_date" class="text-h5 text-grey-6 q-ml-sm">
-                ({{ new Date(show.release_date * 1000).getFullYear() }})
-              </span>
+      <div class="show-details-section">
+        <div class="show-details q-mb-lg">
+          <div class="details-row">
+            <div v-if="show.seasons" class="detail-item">
+              <q-icon name="layers" color="primary" class="q-mr-sm" />
+              <span class="text-weight-medium">Nombre de saisons :</span>
+              <span class="q-ml-sm">{{ show.seasons }}</span>
             </div>
 
-            <div v-if="show.notes?.mean" class="q-mb-md">
-              <div class="rating-container">
-                <q-icon name="star" size="1.5rem" color="amber" />
-                <span class="text-h6 text-weight-bold q-ml-sm">
-                  {{ show.notes.mean.toFixed(1) }}
-                </span>
-                <span class="text-body2 text-grey-6 q-ml-sm"> ({{ show.notes.total }} avis) </span>
-              </div>
+            <div v-if="show.episodes" class="detail-item">
+              <q-icon name="playlist_play" color="primary" class="q-mr-sm" />
+              <span class="text-weight-medium">Nombre d'épisodes total :</span>
+              <span class="q-ml-sm">{{ show.episodes }}</span>
             </div>
 
-            <div v-if="show.genres" class="q-mb-md">
-              <div class="genres-container">
-                <q-chip
-                  v-for="genre in getGenresArray(show.genres)"
-                  :key="genre"
-                  color="primary"
-                  text-color="white"
-                  size="md"
-                  class="q-mr-sm q-mb-sm"
-                >
-                  {{ genre }}
-                </q-chip>
-              </div>
+            <div v-if="show.status" class="detail-item">
+              <q-icon name="info" color="primary" class="q-mr-sm" />
+              <span class="text-weight-medium">Statut :</span>
+              <span class="q-ml-sm">{{ translateStatus(show.status) }}</span>
             </div>
 
-            <div class="show-details q-mb-lg">
-              <div class="row q-gutter-md">
-                <div v-if="show.length" class="col-12 col-sm-6">
-                  <div class="detail-item">
-                    <q-icon name="schedule" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Durée Moyenne d'un épisode :</span>
-                    <span class="q-ml-sm">{{ formatDuration(show.length) }}</span>
-                  </div>
-                </div>
-
-                <div v-if="show.seasons" class="col-12 col-sm-6">
-                  <div class="detail-item">
-                    <q-icon name="layers" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Nombre de saisons :</span>
-                    <span class="q-ml-sm">{{ show.seasons }}</span>
-                  </div>
-                </div>
-
-                <div v-if="show.episodes" class="col-12 col-sm-6">
-                  <div class="detail-item">
-                    <q-icon name="playlist_play" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Nombre d'épisodes total :</span>
-                    <span class="q-ml-sm">{{ show.episodes }}</span>
-                  </div>
-                </div>
-
-                <div v-if="show.status" class="col-12 col-sm-6">
-                  <div class="detail-item">
-                    <q-icon name="info" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Statut :</span>
-                    <span class="q-ml-sm">{{ translateStatus(show.status) }}</span>
-                  </div>
-                </div>
-
-                <div v-if="show.network" class="col-12 col-sm-6">
-                  <div class="detail-item">
-                    <q-icon name="tv" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Chaîne :</span>
-                    <span class="q-ml-sm">{{ show.network }}</span>
-                  </div>
-                </div>
-
-                <div v-if="show.country" class="col-12 col-sm-6">
-                  <div class="detail-item">
-                    <q-icon name="public" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Pays :</span>
-                    <span class="q-ml-sm">{{ show.country }}</span>
-                  </div>
-                </div>
-
-                <div v-if="show.language" class="col-12 col-sm-6">
-                  <div class="detail-item">
-                    <q-icon name="language" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Langue :</span>
-                    <span class="q-ml-sm">{{ show.language }}</span>
-                  </div>
-                </div>
-              </div>
+            <div v-if="show.network" class="detail-item">
+              <q-icon name="tv" color="primary" class="q-mr-sm" />
+              <span class="text-weight-medium">Chaîne :</span>
+              <span class="q-ml-sm">{{ show.network }}</span>
             </div>
 
-            <div v-if="latestEpisode || (nextEpisode && hasValidNextEpisode)" class="q-mb-lg">
-              <div class="text-h5 text-weight-bold text-primary q-mb-md">Épisodes Récents</div>
-              <div class="recent-episodes-container">
-                <div v-if="loadingLatestNext" class="recent-episodes-loading">
-                  <q-spinner-dots size="2rem" color="primary" />
-                  <div class="text-body2 text-grey-6 q-mt-sm">
-                    Chargement des épisodes récents...
-                  </div>
-                </div>
-
-                <div v-else class="recent-episodes-grid">
-                  <div v-if="latestEpisode" class="recent-episode-card latest">
-                    <div class="recent-episode-poster">
-                      <img
-                        :src="getEpisodeImageUrl(latestEpisode, 240, 360)"
-                        :alt="latestEpisode.title"
-                        class="recent-episode-poster-img"
-                        @error="onImageError"
-                      />
-                    </div>
-
-                    <div class="recent-episode-info">
-                      <div class="recent-episode-badge latest-badge">
-                        <q-icon name="history" size="1rem" class="q-mr-xs" />
-                        Dernier épisode
-                      </div>
-                      <div class="recent-episode-title">{{ latestEpisode.title }}</div>
-                      <div class="recent-episode-details">
-                        <span v-if="latestEpisode.season && latestEpisode.episode">
-                          Saison {{ latestEpisode.season }} - Épisode {{ latestEpisode.episode }}
-                        </span>
-                        <span
-                          v-if="latestEpisode.date && !isNaN(latestEpisode.date.getTime())"
-                          class="recent-episode-date"
-                        >
-                          {{ formatDate(latestEpisode.date) }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div v-if="nextEpisode && hasValidNextEpisode" class="recent-episode-card next">
-                    <div class="recent-episode-poster">
-                      <img
-                        :src="getEpisodeImageUrl(nextEpisode, 240, 360)"
-                        :alt="nextEpisode.title"
-                        class="recent-episode-poster-img"
-                        @error="onImageError"
-                      />
-                    </div>
-
-                    <div class="recent-episode-info">
-                      <div class="recent-episode-badge next-badge">
-                        <q-icon name="schedule" size="1rem" class="q-mr-xs" />
-                        Prochain épisode
-                      </div>
-                      <div class="recent-episode-title">{{ nextEpisode.title }}</div>
-                      <div class="recent-episode-details">
-                        <span v-if="nextEpisode.season && nextEpisode.episode">
-                          Saison {{ nextEpisode.season }} - Épisode {{ nextEpisode.episode }}
-                        </span>
-                        <span
-                          v-if="nextEpisode.date && !isNaN(nextEpisode.date.getTime())"
-                          class="recent-episode-date"
-                        >
-                          {{ formatDate(nextEpisode.date) }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="show.seasons_details && show.seasons_details.length > 0" class="q-mb-lg">
-              <div class="text-h5 text-weight-bold text-primary q-mb-md">Saisons et Épisodes</div>
-              <div class="seasons-container">
-                <div
-                  v-for="season in show.seasons_details"
-                  :key="season.number"
-                  class="season-card"
-                  :class="{ 'season-expanded': expandedSeason === season.number }"
-                >
-                  <div class="season-header" @click="toggleSeason(season.number)">
-                    <div class="season-poster-container">
-                      <img
-                        v-if="season.image"
-                        :src="season.image"
-                        :alt="`Saison ${season.number}`"
-                        class="season-poster"
-                        @error="onImageError"
-                      />
-                      <div v-else class="season-poster-placeholder">
-                        <q-icon name="tv" size="2rem" color="grey-5" />
-                      </div>
-                    </div>
-
-                    <div class="season-info">
-                      <div class="season-title">
-                        <q-icon name="layers" color="primary" class="q-mr-sm" />
-                        <span class="text-h6 text-weight-bold">Saison {{ season.number }}</span>
-                      </div>
-                      <div class="season-episodes-count">
-                        {{ season.episodes }} épisode{{ season.episodes > 1 ? 's' : '' }}
-                      </div>
-                    </div>
-
-                    <div class="season-toggle">
-                      <q-icon
-                        :name="expandedSeason === season.number ? 'expand_less' : 'expand_more'"
-                        size="2rem"
-                        color="primary"
-                      />
-                    </div>
-                  </div>
-
-                  <q-slide-transition>
-                    <div v-show="expandedSeason === season.number" class="season-episodes">
-                      <div v-if="loadingEpisodes[season.number]" class="episodes-loading">
-                        <q-spinner-dots size="2rem" color="primary" />
-                        <div class="text-body2 text-grey-6 q-mt-sm">Chargement des épisodes...</div>
-                      </div>
-
-                      <div v-else class="episodes-grid">
-                        <div
-                          v-for="episode in getSeasonEpisodes(season.number)"
-                          :key="episode.id"
-                          class="episode-card"
-                          :class="{ 'episode-error': episode.isError }"
-                        >
-                          <div class="episode-poster">
-                            <img
-                              v-if="!episode.isError"
-                              :src="getEpisodeImageUrl(episode, 200, 280)"
-                              :alt="episode.title"
-                              class="episode-poster-img"
-                              @error="onImageError"
-                            />
-                            <div v-else class="episode-poster-placeholder">
-                              <q-icon name="error" size="1.5rem" color="negative" />
-                            </div>
-                            <div
-                              v-if="!episode.isError && isEpisodeUpcoming(episode)"
-                              class="episode-overlay upcoming"
-                            >
-                              <div class="upcoming-badge">
-                                <q-icon name="schedule" size="0.8rem" class="q-mr-xs" />
-                                À Venir
-                              </div>
-                            </div>
-                          </div>
-
-                          <div class="episode-info">
-                            <div v-if="!episode.isError" class="episode-number">
-                              Épisode {{ episode.episode }}
-                            </div>
-                            <div
-                              class="episode-title"
-                              :class="{ 'text-negative': episode.isError }"
-                            >
-                              {{ episode.title }}
-                            </div>
-                            <div
-                              v-if="
-                                episode.date && !episode.isError && !isNaN(episode.date.getTime())
-                              "
-                              class="episode-date"
-                            >
-                              {{ formatDate(episode.date) }}
-                            </div>
-                            <div v-if="episode.length && !episode.isError" class="episode-length">
-                              <q-icon name="schedule" size="0.8rem" class="q-mr-xs" />
-                              {{ formatDuration(episode.length) }}
-                            </div>
-                            <div v-if="episode.rating && !episode.isError" class="episode-rating">
-                              <q-icon name="star" size="0.8rem" color="amber" class="q-mr-xs" />
-                              {{ episode.rating.toFixed(1) }}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </q-slide-transition>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="show.description" class="q-mb-lg">
-              <div class="text-h6 text-weight-bold text-primary q-mb-sm">Synopsis</div>
-              <div class="text-body1 text-grey-8 description-text">
-                {{ show.description }}
-              </div>
-            </div>
-
-            <div v-if="show.following || show.followers" class="q-mb-lg">
-              <div class="text-h6 text-weight-bold text-primary q-mb-sm">Statistiques</div>
-              <div class="stats-container">
-                <div v-if="show.following" class="stat-item">
-                  <q-icon name="favorite" color="red" class="q-mr-sm" />
-                  <span class="text-weight-medium">{{ show.following }} personnes suivent</span>
-                </div>
-                <div v-if="show.followers" class="stat-item">
-                  <q-icon name="people" color="blue" class="q-mr-sm" />
-                  <span class="text-weight-medium">{{ show.followers }} abonnés</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="show.svods && show.svods.length > 0" class="q-mb-lg">
-              <div class="text-h6 text-weight-bold text-primary q-mb-sm">Disponible sur</div>
-              <div class="streaming-platforms">
-                <q-chip
-                  v-for="svod in show.svods"
-                  :key="svod.id"
-                  color="secondary"
-                  text-color="white"
-                  size="md"
-                  class="q-mr-sm q-mb-sm"
-                >
-                  {{ svod.name }}
-                </q-chip>
-              </div>
+            <div v-if="show.country" class="detail-item">
+              <q-icon name="public" color="primary" class="q-mr-sm" />
+              <span class="text-weight-medium">Pays :</span>
+              <span class="q-ml-sm">{{ show.country }}</span>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-else class="text-center q-py-xl">
-      <q-icon name="error" size="4rem" color="negative" class="q-mb-md" />
-      <div class="text-h6 text-grey-7">Série non trouvée</div>
+    <div v-if="show?.description" class="synopsis-container">
+      <div class="text-h5 text-weight-bold text-primary q-mb-md">Description / Résumé</div>
+      <div class="text-body1 text-grey-8 synopsis-text">
+        {{ show.description }}
+      </div>
+    </div>
+
+    <div class="show-detail-container">
+      <div class="show-info-section">
+        <div class="show-info">
+          <div v-if="latestEpisode || (nextEpisode && hasValidNextEpisode)" class="q-mb-lg">
+            <div class="text-h5 text-weight-bold text-primary q-mb-md">Épisodes Récents</div>
+            <div class="recent-episodes-container">
+              <div v-if="loadingLatestNext" class="recent-episodes-loading">
+                <q-spinner-dots size="2rem" color="primary" />
+                <div class="text-body2 text-grey-6 q-mt-sm">Chargement des épisodes récents...</div>
+              </div>
+
+              <div v-else class="recent-episodes-grid">
+                <div v-if="latestEpisode" class="recent-episode-card latest">
+                  <div class="recent-episode-poster">
+                    <img
+                      :src="getEpisodeImageUrl(latestEpisode, 240, 360)"
+                      :alt="latestEpisode.title"
+                      class="recent-episode-poster-img"
+                      @error="onImageError"
+                    />
+                  </div>
+
+                  <div class="recent-episode-info">
+                    <div class="recent-episode-badge latest-badge">
+                      <q-icon name="history" size="1rem" class="q-mr-xs" />
+                      Dernier épisode
+                    </div>
+                    <div class="recent-episode-title">{{ latestEpisode.title }}</div>
+                    <div class="recent-episode-details">
+                      <span v-if="latestEpisode.season && latestEpisode.episode">
+                        Saison {{ latestEpisode.season }} - Épisode {{ latestEpisode.episode }}
+                      </span>
+                      <span
+                        v-if="latestEpisode.date && !isNaN(latestEpisode.date.getTime())"
+                        class="recent-episode-date"
+                      >
+                        {{ formatDate(latestEpisode.date) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="nextEpisode && hasValidNextEpisode" class="recent-episode-card next">
+                  <div class="recent-episode-poster">
+                    <img
+                      :src="getEpisodeImageUrl(nextEpisode, 240, 360)"
+                      :alt="nextEpisode.title"
+                      class="recent-episode-poster-img"
+                      @error="onImageError"
+                    />
+                  </div>
+
+                  <div class="recent-episode-info">
+                    <div class="recent-episode-badge next-badge">
+                      <q-icon name="schedule" size="1rem" class="q-mr-xs" />
+                      Prochain épisode
+                    </div>
+                    <div class="recent-episode-title">{{ nextEpisode.title }}</div>
+                    <div class="recent-episode-details">
+                      <span v-if="nextEpisode.season && nextEpisode.episode">
+                        Saison {{ nextEpisode.season }} - Épisode {{ nextEpisode.episode }}
+                      </span>
+                      <span
+                        v-if="nextEpisode.date && !isNaN(nextEpisode.date.getTime())"
+                        class="recent-episode-date"
+                      >
+                        {{ formatDate(nextEpisode.date) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="show?.seasons_details && show.seasons_details.length > 0" class="q-mb-lg">
+            <div class="text-h5 text-weight-bold text-primary q-mb-md">Saisons et Épisodes</div>
+            <div class="seasons-container">
+              <div
+                v-for="season in show.seasons_details"
+                :key="season.number"
+                class="season-card"
+                :class="{ 'season-expanded': expandedSeason === season.number }"
+              >
+                <div class="season-header" @click="toggleSeason(season.number)">
+                  <div class="season-poster-container">
+                    <img
+                      v-if="season.image"
+                      :src="season.image"
+                      :alt="`Saison ${season.number}`"
+                      class="season-poster"
+                      @error="onImageError"
+                    />
+                    <div v-else class="season-poster-placeholder">
+                      <q-icon name="tv" size="2rem" color="grey-5" />
+                    </div>
+                  </div>
+
+                  <div class="season-info">
+                    <div class="season-title">
+                      <q-icon name="layers" color="primary" class="q-mr-sm" />
+                      <span class="text-h6 text-weight-bold">Saison {{ season.number }}</span>
+                    </div>
+                    <div class="season-episodes-count">
+                      {{ season.episodes }} épisode{{ season.episodes > 1 ? 's' : '' }}
+                    </div>
+                  </div>
+
+                  <div class="season-toggle">
+                    <q-icon
+                      :name="expandedSeason === season.number ? 'expand_less' : 'expand_more'"
+                      size="2rem"
+                      color="primary"
+                    />
+                  </div>
+                </div>
+
+                <q-slide-transition>
+                  <div v-show="expandedSeason === season.number" class="season-episodes">
+                    <div v-if="loadingEpisodes[season.number]" class="episodes-loading">
+                      <q-spinner-dots size="2rem" color="primary" />
+                      <div class="text-body2 text-grey-6 q-mt-sm">Chargement des épisodes...</div>
+                    </div>
+
+                    <div v-else class="episodes-grid">
+                      <div
+                        v-for="episode in getSeasonEpisodes(season.number)"
+                        :key="episode.id"
+                        class="episode-card"
+                        :class="{ 'episode-error': episode.isError }"
+                      >
+                        <div class="episode-poster">
+                          <img
+                            v-if="!episode.isError"
+                            :src="getEpisodeImageUrl(episode, 200, 280)"
+                            :alt="episode.title"
+                            class="episode-poster-img"
+                            @error="onImageError"
+                          />
+                          <div v-else class="episode-poster-placeholder">
+                            <q-icon name="error" size="1.5rem" color="negative" />
+                          </div>
+                          <div
+                            v-if="!episode.isError && isEpisodeUpcoming(episode)"
+                            class="episode-overlay upcoming"
+                          >
+                            <div class="upcoming-badge">
+                              <q-icon name="schedule" size="0.8rem" class="q-mr-xs" />
+                              À Venir
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="episode-info">
+                          <div v-if="!episode.isError" class="episode-number">
+                            Épisode {{ episode.episode }}
+                          </div>
+                          <div class="episode-title" :class="{ 'text-negative': episode.isError }">
+                            {{ episode.title }}
+                          </div>
+                          <div
+                            v-if="
+                              episode.date && !episode.isError && !isNaN(episode.date.getTime())
+                            "
+                            class="episode-date"
+                          >
+                            {{ formatDate(episode.date) }}
+                          </div>
+                          <div v-if="episode.length && !episode.isError" class="episode-length">
+                            <q-icon name="schedule" size="0.8rem" class="q-mr-xs" />
+                            {{ formatDuration(episode.length) }}
+                          </div>
+                          <div v-if="episode.rating && !episode.isError" class="episode-rating">
+                            <q-icon name="star" size="0.8rem" color="amber" class="q-mr-xs" />
+                            {{ episode.rating.toFixed(1) }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </q-slide-transition>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="show?.svods && show.svods.length > 0" class="q-mb-lg">
+            <div class="text-h6 text-weight-bold text-primary q-mb-sm">Disponible sur</div>
+            <div class="streaming-platforms">
+              <q-chip
+                v-for="svod in show.svods"
+                :key="svod.id"
+                color="secondary"
+                text-color="white"
+                size="md"
+                class="q-mr-sm q-mb-sm"
+              >
+                {{ svod.name }}
+              </q-chip>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </q-page>
 </template>
@@ -451,6 +472,35 @@ const getGenresArray = (genres?: string[] | Record<string, string>): string[] =>
   return Object.values(genres);
 };
 
+const getGenreClass = (genre: string): string => {
+  const genreMap: { [key: string]: string } = {
+    Action: 'action',
+    Aventure: 'adventure',
+    Animation: 'animation',
+    Biographie: 'biography',
+    Comédie: 'comedy',
+    Crime: 'crime',
+    Documentaire: 'documentary',
+    Drame: 'drama',
+    Famille: 'family',
+    Fantastique: 'fantasy',
+    Histoire: 'history',
+    Horreur: 'horror',
+    Musique: 'music',
+    Mystère: 'mystery',
+    Romance: 'romance',
+    'Science-fiction': 'scifi',
+    Sport: 'sport',
+    Thriller: 'thriller',
+    Guerre: 'war',
+    Western: 'western',
+    Enfant: 'family',
+    Children: 'family',
+  };
+
+  return genreMap[genre] || 'default';
+};
+
 const formatDuration = (duration: number | string): string => {
   const totalMinutes = typeof duration === 'string' ? parseInt(duration, 10) : duration;
 
@@ -478,10 +528,6 @@ const onImageError = (event: Event) => {
       img.src = getEpisodePlaceholderUrl(1);
     }
   }
-};
-
-const getShowImageUrl = (showId: string): string => {
-  return showsApi.getShowImage(showId, 400, 600);
 };
 
 const getEpisodePlaceholderUrl = (episodeNumber: number, seasonNumber?: number): string => {
@@ -674,10 +720,329 @@ export default {
 
 <style lang="scss" scoped>
 .page-wrapper {
-  padding: 80px 0 40px 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
+}
+
+.show-banner {
+  position: relative;
+  height: 500px;
+  overflow: hidden;
+  display: flex;
   align-items: center;
+  justify-content: center;
+}
+
+.banner-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.banner-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.7) 100%);
+}
+
+.banner-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.banner-show-info {
+  display: flex;
+  align-items: flex-end;
+  gap: 25px;
+  flex: 1;
+  margin-top: auto;
+  margin-bottom: 10px;
+  max-width: 1200px;
+  width: 100%;
+}
+
+.banner-poster-container {
+  flex-shrink: 0;
+}
+
+.banner-poster {
+  width: 153px;
+  height: 230px;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.banner-text-content {
+  flex: 1;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.banner-title {
+  font-size: 3rem;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+  line-height: 1.1;
+}
+
+.banner-year {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 15px;
+}
+
+.banner-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.2rem;
+}
+
+.rating-text {
+  font-weight: bold;
+  color: #ffc107;
+}
+
+.rating-count {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+}
+
+.banner-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.banner-details {
+  display: flex;
+  gap: 30px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.banner-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.banner-detail-label {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+}
+
+.banner-detail-value {
+  font-weight: 600;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.genre-chip {
+  font-weight: 500;
+  font-size: 0.85rem;
+  padding: 6px 14px;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  border: none;
+  display: inline-block;
+  margin-right: 6px;
+  margin-bottom: 6px;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.genre-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.genre-action {
+  background-color: rgba(231, 76, 60, 0.9);
+  color: white;
+}
+.genre-adventure {
+  background-color: rgba(46, 204, 113, 0.9);
+  color: white;
+}
+.genre-animation {
+  background-color: rgba(155, 89, 182, 0.9);
+  color: white;
+}
+.genre-biography {
+  background-color: rgba(149, 165, 166, 0.9);
+  color: white;
+}
+.genre-comedy {
+  background-color: rgba(241, 196, 15, 0.9);
+  color: #2c3e50;
+}
+.genre-crime {
+  background-color: rgba(44, 62, 80, 0.9);
+  color: white;
+}
+.genre-documentary {
+  background-color: rgba(52, 152, 219, 0.9);
+  color: white;
+}
+.genre-drama {
+  background-color: rgba(142, 68, 173, 0.9);
+  color: white;
+}
+.genre-family {
+  background-color: rgba(26, 188, 156, 0.9);
+  color: white;
+}
+.genre-fantasy {
+  background-color: rgba(230, 126, 34, 0.9);
+  color: white;
+}
+.genre-history {
+  background-color: rgba(127, 140, 141, 0.9);
+  color: white;
+}
+.genre-horror {
+  background-color: rgba(192, 57, 43, 0.9);
+  color: white;
+}
+.genre-music {
+  background-color: rgba(155, 89, 182, 0.9);
+  color: white;
+}
+.genre-mystery {
+  background-color: rgba(44, 62, 80, 0.9);
+  color: white;
+}
+.genre-romance {
+  background-color: rgba(231, 76, 60, 0.9);
+  color: white;
+}
+.genre-scifi {
+  background-color: rgba(52, 152, 219, 0.9);
+  color: white;
+}
+.genre-sport {
+  background-color: rgba(46, 204, 113, 0.9);
+  color: white;
+}
+.genre-thriller {
+  background-color: rgba(44, 62, 80, 0.9);
+  color: white;
+}
+.genre-war {
+  background-color: rgba(127, 140, 141, 0.9);
+  color: white;
+}
+.genre-western {
+  background-color: rgba(230, 126, 34, 0.9);
+  color: white;
+}
+.genre-default {
+  background-color: rgba(149, 165, 166, 0.9);
+  color: white;
+}
+
+.show-info-header {
+  background: white;
+  padding: 30px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.show-info-header-content {
+  display: flex;
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+.show-poster-section {
+  flex-shrink: 0;
+}
+
+.show-poster-large {
+  width: 200px;
+  height: 300px;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.show-info-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.show-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #1976d2;
+  margin: 0 0 10px 0;
+  line-height: 1.2;
+}
+
+.show-year {
+  font-size: 1.3rem;
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.show-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.show-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.show-details-row {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.show-details-section {
+  max-width: 1200px;
+  padding: 20px 20px 0 20px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.synopsis-container {
+  max-width: 1200px;
+  padding: 20px 20px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.synopsis-text {
+  line-height: 1.7;
+  text-align: justify;
+  font-size: 1.1rem;
 }
 
 .back-button-container {
@@ -688,6 +1053,67 @@ export default {
   justify-content: flex-start;
 }
 
+@media (max-width: 768px) {
+  .show-banner {
+    height: 350px;
+  }
+
+  .banner-show-info {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+
+  .banner-poster {
+    width: 120px;
+    height: 180px;
+  }
+
+  .banner-title {
+    font-size: 2rem;
+  }
+
+  .banner-year {
+    font-size: 1.2rem;
+  }
+
+  .banner-rating {
+    font-size: 1rem;
+  }
+
+  .banner-details {
+    gap: 20px;
+  }
+
+  .show-info-header-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+  }
+
+  .show-poster-large {
+    width: 150px;
+    height: 225px;
+  }
+
+  .show-title {
+    font-size: 2rem;
+  }
+
+  .show-details-row {
+    gap: 20px;
+    justify-content: center;
+  }
+
+  .details-row {
+    gap: 15px;
+    justify-content: center;
+  }
+}
+
 .show-detail-container {
   display: flex;
   flex-direction: column;
@@ -695,6 +1121,7 @@ export default {
   max-width: 1200px;
   padding: 0 20px;
   width: auto;
+  margin: 0 auto;
 }
 
 @media (min-width: 768px) {
@@ -769,6 +1196,14 @@ export default {
   padding: 24px;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.details-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  align-items: center;
+  justify-content: center;
 }
 
 .detail-item {
