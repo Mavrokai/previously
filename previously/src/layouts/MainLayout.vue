@@ -2,14 +2,20 @@
   <q-layout view="lHh Lpr lFf">
     <q-header elevated class="bg-white text-primary">
       <q-toolbar>
-        <q-toolbar-title class="text-primary text-weight-bold"> Previously </q-toolbar-title>
+        <q-btn flat no-caps class="text-primary text-weight-bold text-h6" to="/">
+          Previously
+        </q-btn>
 
-        <div class="q-ml-md">
+        <q-space />
+
+        <div class="row q-gutter-sm">
           <q-btn flat label="Séries" icon="tv" to="/series" class="text-primary" />
           <q-btn flat label="Films" icon="movie" to="/movies" class="text-primary" />
         </div>
 
-        <div class="q-ml-auto">
+        <q-space />
+
+        <div>
           <q-btn-dropdown v-if="authStore.isAuthenticated" flat no-caps class="text-primary">
             <template v-slot:label>
               <q-avatar size="32px" color="primary">

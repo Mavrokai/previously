@@ -6,6 +6,16 @@
     </div>
 
     <div v-else-if="show" class="page-wrapper">
+      <div class="back-button-container">
+        <q-btn
+          flat
+          icon="arrow_back"
+          label="Revenir aux Séries"
+          color="primary"
+          @click="$router.push('/series')"
+          class="text-weight-medium back-button"
+        />
+      </div>
       <div class="show-detail-container">
         <div class="show-poster-section">
           <div class="show-poster-container">
@@ -68,7 +78,7 @@
                 <div v-if="show.length" class="col-12 col-sm-6">
                   <div class="detail-item">
                     <q-icon name="schedule" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Durée :</span>
+                    <span class="text-weight-medium">Durée Moyenne d'un épisode :</span>
                     <span class="q-ml-sm">{{ formatDuration(show.length) }}</span>
                   </div>
                 </div>
@@ -666,8 +676,16 @@ export default {
 .page-wrapper {
   padding: 80px 0 40px 0;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+}
+
+.back-button-container {
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 20px 20px 20px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .show-detail-container {
@@ -675,7 +693,7 @@ export default {
   flex-direction: column;
   gap: 24px;
   max-width: 1200px;
-  padding: 20px;
+  padding: 0 20px;
   width: auto;
 }
 
