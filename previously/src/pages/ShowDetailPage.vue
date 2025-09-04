@@ -123,7 +123,7 @@
               </div>
             </div>
 
-            <div v-if="latestEpisode || nextEpisode" class="q-mb-lg">
+            <div v-if="latestEpisode || (nextEpisode && hasValidNextEpisode)" class="q-mb-lg">
               <div class="text-h5 text-weight-bold text-primary q-mb-md">Épisodes Récents</div>
               <div class="recent-episodes-container">
                 <div v-if="loadingLatestNext" class="recent-episodes-loading">
@@ -161,7 +161,7 @@
                     </div>
                   </div>
 
-                  <div v-if="nextEpisode" class="recent-episode-card next">
+                  <div v-if="nextEpisode && hasValidNextEpisode" class="recent-episode-card next">
                     <div class="recent-episode-poster">
                       <img
                         :src="getEpisodeImageUrl(nextEpisode, 200, 120)"
@@ -339,7 +339,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { showsApi, type BetaSeriesShow, type BetaSeriesEpisode } from '../services/betaseries-api';
 
@@ -367,6 +367,16 @@ const loadingEpisodes = ref<Record<number, boolean>>({});
 const latestEpisode = ref<ProcessedEpisode | null>(null);
 const nextEpisode = ref<ProcessedEpisode | null>(null);
 const loadingLatestNext = ref(false);
+
+const hasValidNextEpisode = computed(() => {
+  return (
+    nextEpisode.value &&
+    nextEpisode.value.season &&
+    nextEpisode.value.episode &&
+    nextEpisode.value.title &&
+    nextEpisode.value.title !== 'Épisode undefined'
+  );
+});
 
 const loadShowDetails = async () => {
   const showId = route.params.id as string;
@@ -576,17 +586,24 @@ const loadLatestAndNextEpisodes = async () => {
 
     if (nextResponse.status === 'fulfilled' && nextResponse.value.episode) {
       const episode = nextResponse.value.episode;
-      nextEpisode.value = {
-        id: episode.id,
-        episode: episode.episode,
-        season: episode.season,
-        title: episode.title || `Épisode ${episode.episode}`,
-        date: episode.date ? new Date(episode.date * 1000) : null,
-        image: episode.image || null,
-        description: episode.description,
-        length: episode.length,
-        rating: episode.rating,
-      };
+
+      if (episode.season && episode.episode && episode.title) {
+        nextEpisode.value = {
+          id: episode.id,
+          episode: episode.episode,
+          season: episode.season,
+          title: episode.title,
+          date: episode.date ? new Date(episode.date * 1000) : null,
+          image: episode.image || null,
+          description: episode.description,
+          length: episode.length,
+          rating: episode.rating,
+        };
+      } else {
+        nextEpisode.value = null;
+      }
+    } else {
+      nextEpisode.value = null;
     }
   } catch (error) {
     console.error('Erreur lors du chargement des épisodes récents:', error);
