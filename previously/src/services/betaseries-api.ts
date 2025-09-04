@@ -22,6 +22,7 @@ export interface BetaSeriesShow {
     show?: string;
     box?: string;
   };
+  backdrop?: string;
   genres?: string[] | Record<string, string>;
   svods?: Array<{
     id: number;
@@ -47,6 +48,7 @@ export interface BetaSeriesShow {
     episodes: number;
     image?: string;
   }>;
+  next_trailer?: string;
 }
 
 export interface BetaSeriesEpisode {
@@ -75,6 +77,7 @@ export interface BetaSeriesMovie {
   id: string;
   title: string;
   poster?: string;
+  backdrop?: string;
   followers?: string;
   production_year?: string;
   tmdb_id?: string;
@@ -87,6 +90,7 @@ export interface BetaSeriesMovie {
   };
 
   description?: string;
+  synopsis?: string;
   length?: number;
   director?: string;
   cast?: string;
@@ -96,6 +100,7 @@ export interface BetaSeriesMovie {
     id: number;
     name: string;
   }>;
+  trailer?: string;
 }
 
 export interface SearchParams {
