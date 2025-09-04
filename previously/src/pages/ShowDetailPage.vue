@@ -6,6 +6,16 @@
     </div>
 
     <div v-else-if="show" class="page-wrapper">
+      <div class="back-button-container">
+        <q-btn
+          flat
+          icon="arrow_back"
+          label="Revenir aux Séries"
+          color="primary"
+          @click="$router.push('/series')"
+          class="text-weight-medium back-button"
+        />
+      </div>
       <div class="show-detail-container">
         <div class="show-poster-section">
           <div class="show-poster-container">
@@ -68,7 +78,7 @@
                 <div v-if="show.length" class="col-12 col-sm-6">
                   <div class="detail-item">
                     <q-icon name="schedule" color="primary" class="q-mr-sm" />
-                    <span class="text-weight-medium">Durée :</span>
+                    <span class="text-weight-medium">Durée Moyenne d'un épisode :</span>
                     <span class="q-ml-sm">{{ formatDuration(show.length) }}</span>
                   </div>
                 </div>
@@ -123,7 +133,7 @@
               </div>
             </div>
 
-            <div v-if="latestEpisode || nextEpisode" class="q-mb-lg">
+            <div v-if="latestEpisode || (nextEpisode && hasValidNextEpisode)" class="q-mb-lg">
               <div class="text-h5 text-weight-bold text-primary q-mb-md">Épisodes Récents</div>
               <div class="recent-episodes-container">
                 <div v-if="loadingLatestNext" class="recent-episodes-loading">
@@ -137,7 +147,7 @@
                   <div v-if="latestEpisode" class="recent-episode-card latest">
                     <div class="recent-episode-poster">
                       <img
-                        :src="getEpisodeImageUrl(latestEpisode, 200, 120)"
+                        :src="getEpisodeImageUrl(latestEpisode, 240, 360)"
                         :alt="latestEpisode.title"
                         class="recent-episode-poster-img"
                         @error="onImageError"
@@ -154,17 +164,20 @@
                         <span v-if="latestEpisode.season && latestEpisode.episode">
                           Saison {{ latestEpisode.season }} - Épisode {{ latestEpisode.episode }}
                         </span>
-                        <span v-if="latestEpisode.date" class="recent-episode-date">
+                        <span
+                          v-if="latestEpisode.date && !isNaN(latestEpisode.date.getTime())"
+                          class="recent-episode-date"
+                        >
                           {{ formatDate(latestEpisode.date) }}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div v-if="nextEpisode" class="recent-episode-card next">
+                  <div v-if="nextEpisode && hasValidNextEpisode" class="recent-episode-card next">
                     <div class="recent-episode-poster">
                       <img
-                        :src="getEpisodeImageUrl(nextEpisode, 200, 120)"
+                        :src="getEpisodeImageUrl(nextEpisode, 240, 360)"
                         :alt="nextEpisode.title"
                         class="recent-episode-poster-img"
                         @error="onImageError"
@@ -181,7 +194,10 @@
                         <span v-if="nextEpisode.season && nextEpisode.episode">
                           Saison {{ nextEpisode.season }} - Épisode {{ nextEpisode.episode }}
                         </span>
-                        <span v-if="nextEpisode.date" class="recent-episode-date">
+                        <span
+                          v-if="nextEpisode.date && !isNaN(nextEpisode.date.getTime())"
+                          class="recent-episode-date"
+                        >
                           {{ formatDate(nextEpisode.date) }}
                         </span>
                       </div>
@@ -250,13 +266,22 @@
                           <div class="episode-poster">
                             <img
                               v-if="!episode.isError"
-                              :src="getEpisodeImageUrl(episode, 150, 100)"
+                              :src="getEpisodeImageUrl(episode, 200, 280)"
                               :alt="episode.title"
                               class="episode-poster-img"
                               @error="onImageError"
                             />
                             <div v-else class="episode-poster-placeholder">
                               <q-icon name="error" size="1.5rem" color="negative" />
+                            </div>
+                            <div
+                              v-if="!episode.isError && isEpisodeUpcoming(episode)"
+                              class="episode-overlay upcoming"
+                            >
+                              <div class="upcoming-badge">
+                                <q-icon name="schedule" size="0.8rem" class="q-mr-xs" />
+                                À Venir
+                              </div>
                             </div>
                           </div>
 
@@ -270,7 +295,12 @@
                             >
                               {{ episode.title }}
                             </div>
-                            <div v-if="episode.date && !episode.isError" class="episode-date">
+                            <div
+                              v-if="
+                                episode.date && !episode.isError && !isNaN(episode.date.getTime())
+                              "
+                              class="episode-date"
+                            >
                               {{ formatDate(episode.date) }}
                             </div>
                             <div v-if="episode.length && !episode.isError" class="episode-length">
@@ -339,7 +369,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { showsApi, type BetaSeriesShow, type BetaSeriesEpisode } from '../services/betaseries-api';
 
@@ -367,6 +397,16 @@ const loadingEpisodes = ref<Record<number, boolean>>({});
 const latestEpisode = ref<ProcessedEpisode | null>(null);
 const nextEpisode = ref<ProcessedEpisode | null>(null);
 const loadingLatestNext = ref(false);
+
+const hasValidNextEpisode = computed(() => {
+  return (
+    nextEpisode.value &&
+    nextEpisode.value.season &&
+    nextEpisode.value.episode &&
+    nextEpisode.value.title &&
+    nextEpisode.value.title !== 'Épisode undefined'
+  );
+});
 
 const loadShowDetails = async () => {
   const showId = route.params.id as string;
@@ -459,9 +499,24 @@ const getEpisodePlaceholderUrl = (episodeNumber: number, seasonNumber?: number):
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
+const isEpisodeUpcoming = (episode: ProcessedEpisode): boolean => {
+  if (!episode.date) return false;
+  const now = new Date();
+  const episodeDate = new Date(episode.date);
+  return episodeDate > now;
+};
+
 const getEpisodeImageUrl = (episode: ProcessedEpisode, width = 150, height = 100): string => {
   if (episode.image && episode.image !== '') {
     return episode.image;
+  }
+
+  if (isEpisodeUpcoming(episode) && show.value) {
+    return (
+      show.value.poster ||
+      show.value.images?.poster ||
+      getEpisodePlaceholderUrl(episode.episode, episode.season)
+    );
   }
 
   if (episode.id && episode.id !== 'undefined' && episode.id !== 'null') {
@@ -510,7 +565,7 @@ const loadSeasonEpisodes = async (seasonNumber: number) => {
       episode: episode.episode,
       season: episode.season,
       title: episode.title || `Épisode ${episode.episode}`,
-      date: episode.date ? new Date(episode.date * 1000) : null,
+      date: episode.date ? new Date(episode.date) : null,
       image: episode.image || null,
       description: episode.description,
       length: episode.length,
@@ -541,6 +596,10 @@ const getSeasonEpisodes = (seasonNumber: number) => {
 };
 
 const formatDate = (date: Date): string => {
+  if (!date || isNaN(date.getTime())) {
+    return 'Date non disponible';
+  }
+
   return date.toLocaleDateString('fr-FR', {
     year: 'numeric',
     month: 'long',
@@ -566,7 +625,7 @@ const loadLatestAndNextEpisodes = async () => {
         episode: episode.episode,
         season: episode.season,
         title: episode.title || `Épisode ${episode.episode}`,
-        date: episode.date ? new Date(episode.date * 1000) : null,
+        date: episode.date ? new Date(episode.date) : null,
         image: episode.image || null,
         description: episode.description,
         length: episode.length,
@@ -576,17 +635,24 @@ const loadLatestAndNextEpisodes = async () => {
 
     if (nextResponse.status === 'fulfilled' && nextResponse.value.episode) {
       const episode = nextResponse.value.episode;
-      nextEpisode.value = {
-        id: episode.id,
-        episode: episode.episode,
-        season: episode.season,
-        title: episode.title || `Épisode ${episode.episode}`,
-        date: episode.date ? new Date(episode.date * 1000) : null,
-        image: episode.image || null,
-        description: episode.description,
-        length: episode.length,
-        rating: episode.rating,
-      };
+
+      if (episode.season && episode.episode && episode.title) {
+        nextEpisode.value = {
+          id: episode.id,
+          episode: episode.episode,
+          season: episode.season,
+          title: episode.title,
+          date: episode.date ? new Date(episode.date) : null,
+          image: episode.image || null,
+          description: episode.description,
+          length: episode.length,
+          rating: episode.rating,
+        };
+      } else {
+        nextEpisode.value = null;
+      }
+    } else {
+      nextEpisode.value = null;
     }
   } catch (error) {
     console.error('Erreur lors du chargement des épisodes récents:', error);
@@ -610,8 +676,16 @@ export default {
 .page-wrapper {
   padding: 80px 0 40px 0;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+}
+
+.back-button-container {
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 20px 20px 20px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .show-detail-container {
@@ -619,7 +693,7 @@ export default {
   flex-direction: column;
   gap: 24px;
   max-width: 1200px;
-  padding: 20px;
+  padding: 0 20px;
   width: auto;
 }
 
@@ -854,12 +928,13 @@ export default {
 }
 
 .episode-poster {
+  position: relative;
   flex-shrink: 0;
-  width: 60px;
-  height: 40px;
-  border-radius: 6px;
+  width: 100px;
+  height: 140px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .episode-poster-img {
@@ -875,6 +950,35 @@ export default {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+}
+
+.episode-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+}
+
+.episode-overlay.upcoming {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.upcoming-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 193, 7, 0.9);
+  color: #000;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
 }
 
 .episode-info {
@@ -981,11 +1085,11 @@ export default {
 
 .recent-episode-poster {
   flex-shrink: 0;
-  width: 80px;
-  height: 60px;
-  border-radius: 6px;
+  width: 120px;
+  height: 180px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .recent-episode-poster-img {
@@ -1082,8 +1186,8 @@ export default {
   }
 
   .recent-episode-poster {
-    width: 60px;
-    height: 45px;
+    width: 100px;
+    height: 150px;
   }
 }
 </style>

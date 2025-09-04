@@ -6,6 +6,16 @@
     </div>
 
     <div v-else-if="movie" class="page-wrapper">
+      <div class="back-button-container">
+        <q-btn
+          flat
+          icon="arrow_back"
+          label="Revenir aux Films"
+          color="primary"
+          @click="$router.push('/movies')"
+          class="text-weight-medium back-button"
+        />
+      </div>
       <div class="movie-detail-container">
         <div class="movie-poster-section">
           <div class="movie-poster-container">
@@ -195,8 +205,16 @@ export default {
 .page-wrapper {
   padding: 80px 0 40px 0;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+}
+
+.back-button-container {
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 20px 20px 20px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .movie-poster-container {
@@ -211,7 +229,7 @@ export default {
   flex-direction: column;
   gap: 24px;
   max-width: 1200px;
-  padding: 20px;
+  padding: 0 20px;
   width: auto;
 }
 
