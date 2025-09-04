@@ -137,7 +137,7 @@
                   <div v-if="latestEpisode" class="recent-episode-card latest">
                     <div class="recent-episode-poster">
                       <img
-                        :src="getEpisodeImageUrl(latestEpisode, 200, 120)"
+                        :src="getEpisodeImageUrl(latestEpisode, 240, 360)"
                         :alt="latestEpisode.title"
                         class="recent-episode-poster-img"
                         @error="onImageError"
@@ -154,7 +154,10 @@
                         <span v-if="latestEpisode.season && latestEpisode.episode">
                           Saison {{ latestEpisode.season }} - Épisode {{ latestEpisode.episode }}
                         </span>
-                        <span v-if="latestEpisode.date" class="recent-episode-date">
+                        <span
+                          v-if="latestEpisode.date && !isNaN(latestEpisode.date.getTime())"
+                          class="recent-episode-date"
+                        >
                           {{ formatDate(latestEpisode.date) }}
                         </span>
                       </div>
@@ -164,7 +167,7 @@
                   <div v-if="nextEpisode && hasValidNextEpisode" class="recent-episode-card next">
                     <div class="recent-episode-poster">
                       <img
-                        :src="getEpisodeImageUrl(nextEpisode, 200, 120)"
+                        :src="getEpisodeImageUrl(nextEpisode, 240, 360)"
                         :alt="nextEpisode.title"
                         class="recent-episode-poster-img"
                         @error="onImageError"
@@ -181,7 +184,10 @@
                         <span v-if="nextEpisode.season && nextEpisode.episode">
                           Saison {{ nextEpisode.season }} - Épisode {{ nextEpisode.episode }}
                         </span>
-                        <span v-if="nextEpisode.date" class="recent-episode-date">
+                        <span
+                          v-if="nextEpisode.date && !isNaN(nextEpisode.date.getTime())"
+                          class="recent-episode-date"
+                        >
                           {{ formatDate(nextEpisode.date) }}
                         </span>
                       </div>
@@ -250,13 +256,22 @@
                           <div class="episode-poster">
                             <img
                               v-if="!episode.isError"
-                              :src="getEpisodeImageUrl(episode, 150, 100)"
+                              :src="getEpisodeImageUrl(episode, 200, 280)"
                               :alt="episode.title"
                               class="episode-poster-img"
                               @error="onImageError"
                             />
                             <div v-else class="episode-poster-placeholder">
                               <q-icon name="error" size="1.5rem" color="negative" />
+                            </div>
+                            <div
+                              v-if="!episode.isError && isEpisodeUpcoming(episode)"
+                              class="episode-overlay upcoming"
+                            >
+                              <div class="upcoming-badge">
+                                <q-icon name="schedule" size="0.8rem" class="q-mr-xs" />
+                                À Venir
+                              </div>
                             </div>
                           </div>
 
@@ -270,7 +285,12 @@
                             >
                               {{ episode.title }}
                             </div>
-                            <div v-if="episode.date && !episode.isError" class="episode-date">
+                            <div
+                              v-if="
+                                episode.date && !episode.isError && !isNaN(episode.date.getTime())
+                              "
+                              class="episode-date"
+                            >
                               {{ formatDate(episode.date) }}
                             </div>
                             <div v-if="episode.length && !episode.isError" class="episode-length">
@@ -469,9 +489,24 @@ const getEpisodePlaceholderUrl = (episodeNumber: number, seasonNumber?: number):
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
+const isEpisodeUpcoming = (episode: ProcessedEpisode): boolean => {
+  if (!episode.date) return false;
+  const now = new Date();
+  const episodeDate = new Date(episode.date);
+  return episodeDate > now;
+};
+
 const getEpisodeImageUrl = (episode: ProcessedEpisode, width = 150, height = 100): string => {
   if (episode.image && episode.image !== '') {
     return episode.image;
+  }
+
+  if (isEpisodeUpcoming(episode) && show.value) {
+    return (
+      show.value.poster ||
+      show.value.images?.poster ||
+      getEpisodePlaceholderUrl(episode.episode, episode.season)
+    );
   }
 
   if (episode.id && episode.id !== 'undefined' && episode.id !== 'null') {
@@ -520,7 +555,7 @@ const loadSeasonEpisodes = async (seasonNumber: number) => {
       episode: episode.episode,
       season: episode.season,
       title: episode.title || `Épisode ${episode.episode}`,
-      date: episode.date ? new Date(episode.date * 1000) : null,
+      date: episode.date ? new Date(episode.date) : null,
       image: episode.image || null,
       description: episode.description,
       length: episode.length,
@@ -551,6 +586,10 @@ const getSeasonEpisodes = (seasonNumber: number) => {
 };
 
 const formatDate = (date: Date): string => {
+  if (!date || isNaN(date.getTime())) {
+    return 'Date non disponible';
+  }
+
   return date.toLocaleDateString('fr-FR', {
     year: 'numeric',
     month: 'long',
@@ -576,7 +615,7 @@ const loadLatestAndNextEpisodes = async () => {
         episode: episode.episode,
         season: episode.season,
         title: episode.title || `Épisode ${episode.episode}`,
-        date: episode.date ? new Date(episode.date * 1000) : null,
+        date: episode.date ? new Date(episode.date) : null,
         image: episode.image || null,
         description: episode.description,
         length: episode.length,
@@ -593,7 +632,7 @@ const loadLatestAndNextEpisodes = async () => {
           episode: episode.episode,
           season: episode.season,
           title: episode.title,
-          date: episode.date ? new Date(episode.date * 1000) : null,
+          date: episode.date ? new Date(episode.date) : null,
           image: episode.image || null,
           description: episode.description,
           length: episode.length,
@@ -871,12 +910,13 @@ export default {
 }
 
 .episode-poster {
+  position: relative;
   flex-shrink: 0;
-  width: 60px;
-  height: 40px;
-  border-radius: 6px;
+  width: 100px;
+  height: 140px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .episode-poster-img {
@@ -892,6 +932,35 @@ export default {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+}
+
+.episode-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+}
+
+.episode-overlay.upcoming {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.upcoming-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 193, 7, 0.9);
+  color: #000;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
 }
 
 .episode-info {
@@ -998,11 +1067,11 @@ export default {
 
 .recent-episode-poster {
   flex-shrink: 0;
-  width: 80px;
-  height: 60px;
-  border-radius: 6px;
+  width: 120px;
+  height: 180px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .recent-episode-poster-img {
@@ -1099,8 +1168,8 @@ export default {
   }
 
   .recent-episode-poster {
-    width: 60px;
-    height: 45px;
+    width: 100px;
+    height: 150px;
   }
 }
 </style>
