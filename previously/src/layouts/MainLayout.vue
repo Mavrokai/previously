@@ -66,11 +66,15 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth-store';
 
+const router = useRouter();
 const authStore = useAuthStore();
 
-const goToProfile = () => {};
+const goToProfile = () => {
+  void router.push('/profile');
+};
 
 const goToLogin = () => {
   authStore.initiateOAuthLogin();
