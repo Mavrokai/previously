@@ -5,6 +5,18 @@ const BETA_SERIES_CONFIG = {
   baseUrl: 'https://api.betaseries.com',
 };
 
+const getAuthHeaders = (token?: string) => {
+  const headers: Record<string, string> = {
+    'X-BetaSeries-Key': BETA_SERIES_CONFIG.clientId,
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+};
+
 export interface BetaSeriesShow {
   id: string;
   title: string;
@@ -324,5 +336,136 @@ export const moviesApi = {
 
   getMovieImage(movieId: string, width = 250, height = 375, language = 'original'): string {
     return `${BETA_SERIES_CONFIG.baseUrl}/pictures/movies?id=${movieId}&width=${width}&height=${height}&language=${language}&locale=fr&key=${BETA_SERIES_CONFIG.clientId}`;
+  },
+
+  async getMemberMovies(
+    token: string,
+    params: {
+      state?: '0' | '1' | '2';
+      released?: '0' | '1' | '2';
+      start?: number;
+      limit?: number;
+      order?: 'alphabetical' | 'popularity' | 'added' | 'release' | 'svod';
+      summary?: boolean;
+      tags?: string;
+      excluded_tags?: string;
+      platforms?: string;
+    } = {},
+  ): Promise<{ movies: BetaSeriesMovie[] }> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/movies/member`, {
+      params: { ...params, locale: 'fr' },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async getFavoriteMovies(
+    token: string,
+    params: {
+      start?: number;
+      limit?: number;
+      order?: 'alphabetical' | 'popularity' | 'added' | 'release' | 'svod';
+      summary?: boolean;
+    } = {},
+  ): Promise<{ movies: BetaSeriesMovie[] }> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/movies/favorites`, {
+      params: { ...params, locale: 'fr' },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+};
+
+export const memberApi = {
+  async getMemberShows(
+    token: string,
+    params: {
+      order?: 'alphabetical' | 'progression' | 'remaining_time' | 'remaining_episodes';
+      limit?: number;
+      offset?: number;
+      status?: 'current' | 'active' | 'archived';
+      summary?: boolean;
+      includes?: string;
+    } = {},
+  ): Promise<{ shows: BetaSeriesShow[] }> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/shows/member`, {
+      params: { ...params, locale: 'fr' },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async getFavoriteShows(
+    token: string,
+    params: {
+      order?: 'alphabetical' | 'progression' | 'remaining_time' | 'remaining_episodes';
+      limit?: number;
+      offset?: number;
+      status?: 'current' | 'active' | 'archived';
+      summary?: boolean;
+      includes?: string;
+    } = {},
+  ): Promise<{ shows: BetaSeriesShow[] }> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/shows/favorites`, {
+      params: { ...params, locale: 'fr' },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async getMemberInfo(token: string): Promise<Record<string, unknown>> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/members/infos`, {
+      params: { locale: 'fr' },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async getMemberStats(token: string, year?: string): Promise<Record<string, unknown>> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/members/year`, {
+      params: { year, locale: 'fr' },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async getMemberTimeline(
+    token: string,
+    params: {
+      nbpp?: number;
+      since_id?: string;
+      last_id?: string;
+      types?: string;
+    } = {},
+  ): Promise<Record<string, unknown>> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/timeline/member`, {
+      params: { ...params, locale: 'fr' },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async getWatchedEpisodes(
+    token: string,
+    showId?: string,
+  ): Promise<{ episodes: BetaSeriesEpisode[] }> {
+    if (!showId) {
+      return { episodes: [] };
+    }
+
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/shows/episodes`, {
+      params: {
+        id: showId,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+
+    const allEpisodes = response.data.episodes || [];
+    const watchedEpisodes = allEpisodes.filter(
+      (episode: BetaSeriesEpisode) => episode.user?.seen === true || episode.seen === true,
+    );
+
+    return { episodes: watchedEpisodes };
   },
 };

@@ -22,6 +22,7 @@ export interface BetaSeriesUser {
   login: string;
   email?: string;
   avatar?: string;
+  profile_banner?: string;
   stats?: {
     shows: number;
     episodes: number;
