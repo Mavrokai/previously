@@ -363,7 +363,6 @@
                       </div>
                     </div>
 
-                    <!-- Section pour les épisodes non vus -->
                     <div v-if="hasWatchedEpisodes(show.id)" class="unwatched-episodes-section">
                       <div class="episodes-header">
                         <h4 class="episodes-title">
