@@ -36,6 +36,20 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  const initializeUser = () => {
+    const savedUser = localStorage.getItem('betaseries_user');
+    if (savedUser) {
+      try {
+        user.value = JSON.parse(savedUser);
+      } catch (err) {
+        console.error('Erreur lors du parsing des données utilisateur:', err);
+        localStorage.removeItem('betaseries_user');
+      }
+    }
+  };
+
+  initializeUser();
+
   const isAuthenticated = computed(() => !!token.value);
 
   const initializeAuth = async () => {
@@ -105,6 +119,7 @@ export const useAuthStore = defineStore('auth', () => {
       });
 
       user.value = response.data.member;
+      localStorage.setItem('betaseries_user', JSON.stringify(response.data.member));
     } catch (err) {
       console.error('Erreur lors de la récupération des informations utilisateur:', err);
     }
@@ -114,7 +129,10 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null;
     user.value = null;
     localStorage.removeItem('betaseries_token');
+    localStorage.removeItem('betaseries_user');
     error.value = null;
+
+    window.location.reload();
   };
 
   const clearError = () => {

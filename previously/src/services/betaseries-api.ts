@@ -11,7 +11,7 @@ const getAuthHeaders = (token?: string) => {
   };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers['X-BetaSeries-Token'] = token;
   }
 
   return headers;
@@ -445,6 +445,22 @@ export const memberApi = {
     return response.data;
   },
 
+  async getSeasonEpisodes(
+    token: string,
+    showId: string,
+    seasonNumber: number,
+  ): Promise<{ episodes: BetaSeriesEpisode[] }> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/shows/episodes`, {
+      params: {
+        id: showId,
+        season: seasonNumber,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
   async getWatchedEpisodes(
     token: string,
     showId?: string,
@@ -467,5 +483,80 @@ export const memberApi = {
     );
 
     return { episodes: watchedEpisodes };
+  },
+
+  async markEpisodeAsWatched(
+    token: string,
+    episodeId: string,
+  ): Promise<{ episode: BetaSeriesEpisode }> {
+    const response = await axios.post(
+      `${BETA_SERIES_CONFIG.baseUrl}/episodes/watched`,
+      { id: episodeId },
+      { headers: getAuthHeaders(token) },
+    );
+    return response.data;
+  },
+
+  async markEpisodeAsUnwatched(
+    token: string,
+    episodeId: string,
+  ): Promise<{ episode: BetaSeriesEpisode }> {
+    const response = await axios.delete(`${BETA_SERIES_CONFIG.baseUrl}/episodes/watched`, {
+      params: { id: episodeId },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async markMovieAsWatched(token: string, movieId: string): Promise<{ movie: BetaSeriesMovie }> {
+    const response = await axios.post(`${BETA_SERIES_CONFIG.baseUrl}/movies/movie`, null, {
+      params: {
+        id: movieId,
+        state: '1', // 1 = watched
+        mail: '0',
+        twitter: '0',
+        profile: '1',
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async markMovieAsUnwatched(token: string, movieId: string): Promise<{ movie: BetaSeriesMovie }> {
+    const response = await axios.post(`${BETA_SERIES_CONFIG.baseUrl}/movies/movie`, null, {
+      params: {
+        id: movieId,
+        state: '0', // 0 = to watch (remove from watched)
+        mail: '0',
+        twitter: '0',
+        profile: '1',
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async addFavoriteShow(token: string, showId: string): Promise<{ show: BetaSeriesShow }> {
+    const response = await axios.post(`${BETA_SERIES_CONFIG.baseUrl}/shows/favorite`, null, {
+      params: {
+        id: showId,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
+  },
+
+  async removeFavoriteShow(token: string, showId: string): Promise<{ show: BetaSeriesShow }> {
+    const response = await axios.delete(`${BETA_SERIES_CONFIG.baseUrl}/shows/favorite`, {
+      params: {
+        id: showId,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return response.data;
   },
 };

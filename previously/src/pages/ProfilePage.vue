@@ -45,9 +45,9 @@
                   <span class="stat-value">{{ authStore.user.stats.shows }}</span>
                 </div>
                 <div class="stat-item">
-                  <q-icon name="play_circle" color="white" class="q-mr-sm" />
-                  <span class="stat-label">Épisodes :</span>
-                  <span class="stat-value">{{ authStore.user.stats.episodes }}</span>
+                  <q-icon name="favorite" color="white" class="q-mr-sm" />
+                  <span class="stat-label">Favoris :</span>
+                  <span class="stat-value">{{ favoriteMovies.length + favoriteShows.length }}</span>
                 </div>
               </div>
             </div>
@@ -81,9 +81,9 @@
                 <span class="stat-value">{{ authStore.user.stats.shows }}</span>
               </div>
               <div class="stat-item">
-                <q-icon name="play_circle" color="primary" class="q-mr-sm" />
-                <span class="stat-label">Épisodes :</span>
-                <span class="stat-value">{{ authStore.user.stats.episodes }}</span>
+                <q-icon name="favorite" color="primary" class="q-mr-sm" />
+                <span class="stat-label">Favoris :</span>
+                <span class="stat-value">{{ favoriteMovies.length + favoriteShows.length }}</span>
               </div>
             </div>
           </div>
@@ -341,9 +341,74 @@
                             </span>
                           </div>
                         </div>
-                        <div v-if="episode.rating" class="episode-rating">
-                          <q-icon name="star" size="0.8rem" color="amber" class="q-mr-xs" />
-                          {{ episode.rating.toFixed(1) }}
+                        <div class="episode-actions">
+                          <div v-if="episode.rating" class="episode-rating">
+                            <q-icon name="star" size="0.8rem" color="amber" class="q-mr-xs" />
+                            {{ episode.rating.toFixed(1) }}
+                          </div>
+                          <q-btn
+                            :loading="loadingEpisodeActions[episode.id]"
+                            :color="'negative'"
+                            :text-color="'white'"
+                            :icon="'visibility_off'"
+                            :label="'Non vu'"
+                            @click.stop="markEpisodeAsUnwatched(episode.id, show.id)"
+                            class="unwatch-btn"
+                            size="sm"
+                            dense
+                            no-caps
+                            unelevated
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Section pour les épisodes non vus -->
+                    <div v-if="hasWatchedEpisodes(show.id)" class="unwatched-episodes-section">
+                      <div class="episodes-header">
+                        <h4 class="episodes-title">
+                          <q-icon name="play_circle_outline" class="q-mr-sm" />
+                          Épisodes non vus ({{ getUnwatchedEpisodesCount(show.id) }})
+                        </h4>
+                      </div>
+
+                      <div v-if="getUnwatchedEpisodes(show.id).length === 0" class="no-episodes">
+                        <q-icon name="check_circle" color="green" class="q-mr-sm" />
+                        <span>Tous les épisodes sont vus !</span>
+                      </div>
+
+                      <div v-else class="episodes-list">
+                        <div
+                          v-for="episode in getUnwatchedEpisodes(show.id)"
+                          :key="episode.id"
+                          class="episode-item unwatched"
+                        >
+                          <div class="episode-info">
+                            <div class="episode-title">{{ episode.title }}</div>
+                            <div class="episode-details">
+                              <span v-if="episode.season && episode.episode" class="episode-number">
+                                S{{ episode.season }}E{{ episode.episode }}
+                              </span>
+                              <span v-if="episode.date" class="episode-date">
+                                {{ formatDate(episode.date.toString()) }}
+                              </span>
+                            </div>
+                          </div>
+                          <div class="episode-actions">
+                            <q-btn
+                              :loading="loadingEpisodeActions[episode.id]"
+                              :color="'positive'"
+                              :text-color="'white'"
+                              :icon="'visibility'"
+                              :label="'Marquer vu'"
+                              @click.stop="markEpisodeAsWatched(episode.id, show.id)"
+                              class="watch-btn"
+                              size="sm"
+                              dense
+                              no-caps
+                              unelevated
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -447,6 +512,7 @@ import { useAuthStore } from '../stores/auth-store';
 import {
   moviesApi,
   memberApi,
+  showsApi,
   type BetaSeriesMovie,
   type BetaSeriesShow,
   type BetaSeriesEpisode,
@@ -473,6 +539,8 @@ const errorMessage = ref<string | null>(null);
 const userBanner = ref<string | null>(null);
 const expandedShows = ref<string[]>([]);
 const showEpisodes = ref<Record<string, BetaSeriesEpisode[]>>({});
+const allShowEpisodes = ref<Record<string, BetaSeriesEpisode[]>>({});
+const loadingEpisodeActions = ref<Record<string, boolean>>({});
 
 const tabOptions = [
   { label: 'Films vus', value: 'movies' },
@@ -601,13 +669,12 @@ const refreshData = async () => {
 
   try {
     await loadUserInfo();
+    await loadFavorites();
 
     if (currentTab.value === 'movies') {
       await loadWatchedMovies();
     } else if (currentTab.value === 'shows') {
       await loadWatchedShows();
-    } else if (currentTab.value === 'favorites') {
-      await loadFavorites();
     }
   } catch (error) {
     console.error('Erreur lors du chargement des données:', error);
@@ -653,11 +720,47 @@ const loadShowEpisodes = async (showId: string) => {
   if (!authStore.token) return;
 
   try {
-    const response = await memberApi.getWatchedEpisodes(authStore.token, showId);
-    showEpisodes.value[showId] = response.episodes || [];
+    const watchedResponse = await memberApi.getWatchedEpisodes(authStore.token, showId);
+    showEpisodes.value[showId] = watchedResponse.episodes || [];
+
+    await loadAllSeasonsEpisodes(showId);
   } catch (error) {
     console.error('Erreur lors du chargement des épisodes:', error);
     showEpisodes.value[showId] = [];
+    allShowEpisodes.value[showId] = [];
+  }
+};
+
+const loadAllSeasonsEpisodes = async (showId: string) => {
+  if (!authStore.token) return;
+
+  try {
+    const showDetails = await showsApi.getShowDetails(showId);
+    const totalSeasons = showDetails.show.seasons || 1;
+
+    const allEpisodesPromises = [];
+    for (let season = 1; season <= totalSeasons; season++) {
+      allEpisodesPromises.push(
+        showsApi.getSeasonEpisodes(showId, season).catch((error) => {
+          console.warn(`Erreur lors du chargement de la saison ${season}:`, error);
+          return { episodes: [] };
+        }),
+      );
+    }
+
+    const allSeasonsResponses = await Promise.allSettled(allEpisodesPromises);
+    const allEpisodes: BetaSeriesEpisode[] = [];
+
+    allSeasonsResponses.forEach((response) => {
+      if (response.status === 'fulfilled' && response.value.episodes) {
+        allEpisodes.push(...response.value.episodes);
+      }
+    });
+
+    allShowEpisodes.value[showId] = allEpisodes;
+  } catch (error) {
+    console.error('Erreur lors du chargement de toutes les saisons:', error);
+    allShowEpisodes.value[showId] = [];
   }
 };
 
@@ -744,6 +847,76 @@ const onImageError = (event: Event) => {
   const img = event.target as HTMLImageElement;
   if (img) {
     img.style.display = 'none';
+  }
+};
+
+const getUnwatchedEpisodes = (showId: string): BetaSeriesEpisode[] => {
+  const allEpisodes = allShowEpisodes.value[showId] || [];
+  const watchedEpisodes = showEpisodes.value[showId] || [];
+  const watchedIds = new Set(watchedEpisodes.map((ep) => ep.id));
+
+  return allEpisodes.filter((episode) => !watchedIds.has(episode.id));
+};
+
+const getUnwatchedEpisodesCount = (showId: string): number => {
+  return getUnwatchedEpisodes(showId).length;
+};
+
+const hasWatchedEpisodes = (showId: string): boolean => {
+  return (showEpisodes.value[showId]?.length ?? 0) > 0;
+};
+
+const markEpisodeAsWatched = async (episodeId: string, showId: string) => {
+  if (!authStore.token) {
+    console.error("Token d'authentification manquant");
+    return;
+  }
+
+  loadingEpisodeActions.value[episodeId] = true;
+
+  try {
+    await memberApi.markEpisodeAsWatched(authStore.token, episodeId);
+
+    const allEpisodes = allShowEpisodes.value[showId] || [];
+    const episodeToAdd = allEpisodes.find((ep) => ep.id === episodeId);
+    const currentWatched = showEpisodes.value[showId];
+    if (episodeToAdd && currentWatched) {
+      showEpisodes.value[showId] = [...currentWatched, episodeToAdd];
+    }
+
+    if (authStore.user?.stats) {
+      authStore.user.stats.shows = (authStore.user.stats.shows || 0) + 1;
+    }
+  } catch (error) {
+    console.error("Erreur lors du marquage de l'épisode comme vu:", error);
+  } finally {
+    loadingEpisodeActions.value[episodeId] = false;
+  }
+};
+
+const markEpisodeAsUnwatched = async (episodeId: string, showId: string) => {
+  if (!authStore.token) {
+    console.error("Token d'authentification manquant");
+    return;
+  }
+
+  loadingEpisodeActions.value[episodeId] = true;
+
+  try {
+    await memberApi.markEpisodeAsUnwatched(authStore.token, episodeId);
+
+    const episodes = showEpisodes.value[showId];
+    if (episodes) {
+      showEpisodes.value[showId] = episodes.filter((episode) => episode.id !== episodeId);
+    }
+
+    if (authStore.user?.stats) {
+      authStore.user.stats.shows = Math.max((authStore.user.stats.shows || 0) - 1, 0);
+    }
+  } catch (error) {
+    console.error("Erreur lors du marquage de l'épisode comme non vu:", error);
+  } finally {
+    loadingEpisodeActions.value[episodeId] = false;
   }
 };
 
@@ -1321,6 +1494,12 @@ onMounted(async () => {
   font-style: italic;
 }
 
+.episode-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .episode-rating {
   display: flex;
   align-items: center;
@@ -1331,6 +1510,51 @@ onMounted(async () => {
 
 .show-card-column.has-banner .episode-rating {
   color: #ffc107;
+}
+
+.unwatch-btn {
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 6px 12px;
+  transition: all 0.2s ease;
+  font-size: 0.75rem;
+}
+
+.unwatch-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+}
+
+.unwatched-episodes-section {
+  margin-top: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 16px;
+}
+
+.show-card-column.has-banner .unwatched-episodes-section {
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+.episode-item.unwatched {
+  opacity: 0.8;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.show-card-column.has-banner .episode-item.unwatched {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.watch-btn {
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 6px 12px;
+  transition: all 0.2s ease;
+  font-size: 0.75rem;
+}
+
+.watch-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
 }
 
 .movie-poster,

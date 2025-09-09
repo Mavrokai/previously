@@ -75,6 +75,21 @@
                   <span class="banner-detail-value">{{ movie.language }}</span>
                 </div>
               </div>
+
+              <div class="banner-actions">
+                <q-btn
+                  :loading="markingMovieAsWatched"
+                  :color="isMovieWatched ? 'green' : 'white'"
+                  :text-color="isMovieWatched ? 'white' : 'primary'"
+                  :icon="isMovieWatched ? 'check_circle' : 'done'"
+                  :label="isMovieWatched ? 'Film vu' : 'Marquer le film comme vu'"
+                  @click="toggleMovieWatched"
+                  class="banner-mark-movie-btn"
+                  :class="{ 'movie-watched': isMovieWatched }"
+                  no-caps
+                  unelevated
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -191,19 +206,49 @@
       <q-icon name="error" size="4rem" color="negative" class="q-mb-md" />
       <div class="text-h6 text-grey-7">Film non trouvé</div>
     </div>
+
+    <!-- Popup de connexion -->
+    <q-dialog v-model="showLoginDialog" persistent>
+      <q-card class="login-dialog-card">
+        <q-card-section class="text-center q-pa-lg">
+          <q-icon name="person" size="4rem" color="primary" class="q-mb-lg" />
+          <div class="text-h5 text-weight-bold q-mb-md">Connexion requise</div>
+          <div class="text-body1 text-grey-7 q-mb-lg">
+            Vous devez être connecté pour effectuer cette action
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="center" class="q-pa-lg q-pt-none">
+          <q-btn
+            unelevated
+            label="Refuser"
+            color="negative"
+            text-color="white"
+            @click="showLoginDialog = false"
+            class="q-mr-sm q-px-xl"
+          />
+          <q-btn color="primary" label="Se connecter" @click="goToLogin" class="q-px-xl" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { moviesApi, type BetaSeriesMovie } from '../services/betaseries-api';
+import { moviesApi, memberApi, type BetaSeriesMovie } from '../services/betaseries-api';
+import { useAuthStore } from '../stores/auth-store';
 
 const route = useRoute();
+const authStore = useAuthStore();
 
 const movie = ref<BetaSeriesMovie | null>(null);
 const isLoading = ref(false);
 const imageError = ref(false);
+const markingMovieAsWatched = ref(false);
+const isMovieWatched = ref(false);
+const showLoginDialog = ref(false);
 
 const loadMovieDetails = async () => {
   const movieId = route.params.id as string;
@@ -216,11 +261,58 @@ const loadMovieDetails = async () => {
     isLoading.value = true;
     const response = await moviesApi.getMovieDetails(movieId);
     movie.value = response.movie;
+
+    if (authStore.isAuthenticated) {
+      await checkMovieWatchedStatus();
+    }
   } catch (error) {
     console.error('Erreur lors du chargement du film:', error);
     movie.value = null;
   } finally {
     isLoading.value = false;
+  }
+};
+
+const checkMovieWatchedStatus = async () => {
+  if (!authStore || !authStore.token || !movie.value) return;
+
+  try {
+    const response = await moviesApi.getMemberMovies(authStore.token, {
+      state: '1',
+      limit: 1000,
+    });
+
+    isMovieWatched.value = response.movies.some((m: BetaSeriesMovie) => m.id === movie.value?.id);
+  } catch (error) {
+    console.error('Erreur lors de la vérification du statut du film:', error);
+  }
+};
+
+const toggleMovieWatched = async () => {
+  if (!authStore.isAuthenticated) {
+    showLoginDialog.value = true;
+    return;
+  }
+
+  if (!movie.value) {
+    console.error('Film non chargé');
+    return;
+  }
+
+  markingMovieAsWatched.value = true;
+
+  try {
+    if (isMovieWatched.value) {
+      await memberApi.markMovieAsUnwatched(authStore.token!, movie.value.id);
+      isMovieWatched.value = false;
+    } else {
+      await memberApi.markMovieAsWatched(authStore.token!, movie.value.id);
+      isMovieWatched.value = true;
+    }
+  } catch (error) {
+    console.error('Erreur lors du marquage du film:', error);
+  } finally {
+    markingMovieAsWatched.value = false;
   }
 };
 
@@ -265,6 +357,14 @@ const getGenreClass = (genre: string): string => {
   };
 
   return genreMap[genre] || 'default';
+};
+
+const goToLogin = () => {
+  showLoginDialog.value = false;
+
+  localStorage.setItem('redirect_after_login', route.fullPath);
+
+  authStore.initiateOAuthLogin();
 };
 
 onMounted(() => {
@@ -414,6 +514,36 @@ export default {
   font-weight: 600;
   color: white;
   font-size: 0.9rem;
+}
+
+.banner-actions {
+  margin-top: 20px;
+}
+
+.banner-mark-movie-btn {
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 12px 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  touch-action: manipulation;
+  will-change: transform, box-shadow;
+}
+
+.banner-mark-movie-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.banner-mark-movie-btn.movie-watched {
+  background-color: #4caf50 !important;
+  color: white !important;
+}
+
+.banner-mark-movie-btn.movie-watched:hover {
+  background-color: #45a049 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
 }
 
 .genre-chip {
@@ -730,5 +860,11 @@ export default {
     gap: 20px;
     justify-content: center;
   }
+}
+
+.login-dialog-card {
+  min-width: 400px;
+  max-width: 500px;
+  border-radius: 16px;
 }
 </style>

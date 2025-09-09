@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth-store';
 
@@ -79,4 +80,10 @@ const goToProfile = () => {
 const goToLogin = () => {
   authStore.initiateOAuthLogin();
 };
+
+onMounted(async () => {
+  if (authStore.isAuthenticated && !authStore.user) {
+    await authStore.fetchUserInfo();
+  }
+});
 </script>

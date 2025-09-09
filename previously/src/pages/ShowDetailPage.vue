@@ -76,6 +76,52 @@
                   <span class="banner-detail-value">{{ show.language }}</span>
                 </div>
               </div>
+
+              <div class="banner-actions">
+                <q-btn
+                  :loading="markingAllAsWatched"
+                  :color="allEpisodesWatched ? 'green' : 'white'"
+                  :text-color="allEpisodesWatched ? 'white' : 'primary'"
+                  :icon="allEpisodesWatched ? 'check_circle' : 'done_all'"
+                  :label="
+                    allEpisodesWatched
+                      ? 'Série complète vue'
+                      : 'Marquer la série complète comme vue'
+                  "
+                  @click="markAllEpisodesAsWatched"
+                  class="banner-mark-all-btn"
+                  :class="{ 'all-watched': allEpisodesWatched }"
+                  no-caps
+                  unelevated
+                />
+                <q-btn
+                  v-if="followFeatureEnabled"
+                  :loading="togglingFollow"
+                  :color="isFollowing ? 'red' : 'white'"
+                  :text-color="isFollowing ? 'white' : 'primary'"
+                  :icon="isFollowing ? 'favorite' : 'favorite_border'"
+                  :label="isFollowing ? 'Ne plus suivre' : 'Suivre la série'"
+                  @click="toggleFollowShow"
+                  class="banner-follow-btn"
+                  :class="{ following: isFollowing }"
+                  no-caps
+                  unelevated
+                />
+
+                <q-btn
+                  v-if="isFollowing"
+                  :loading="togglingFavorite"
+                  :color="isFavorite ? 'amber' : 'white'"
+                  :text-color="isFavorite ? 'white' : 'primary'"
+                  :icon="isFavorite ? 'star' : 'star_border'"
+                  :label="isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+                  @click="toggleFavoriteShow"
+                  class="banner-favorite-btn"
+                  :class="{ favorited: isFavorite }"
+                  no-caps
+                  unelevated
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -359,6 +405,33 @@
                             <q-icon name="star" size="0.8rem" color="amber" class="q-mr-xs" />
                             {{ episode.rating.toFixed(1) }}
                           </div>
+                          <div
+                            v-if="!episode.isError && !isEpisodeUpcoming(episode)"
+                            class="episode-actions"
+                          >
+                            <q-btn
+                              v-if="!episode.user?.seen && !episode.seen"
+                              flat
+                              dense
+                              color="primary"
+                              icon="check_circle_outline"
+                              label="Marquer comme vu"
+                              size="sm"
+                              @click="markEpisodeAsWatched(episode.id)"
+                              :loading="loadingEpisodeActions[episode.id]"
+                            />
+                            <q-btn
+                              v-else
+                              flat
+                              dense
+                              color="positive"
+                              icon="check_circle"
+                              label="Vu"
+                              size="sm"
+                              @click="markEpisodeAsUnwatched(episode.id)"
+                              :loading="loadingEpisodeActions[episode.id]"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -386,13 +459,49 @@
         </div>
       </div>
     </div>
+
+    <!-- Popup de connexion -->
+    <q-dialog v-model="showLoginDialog" persistent>
+      <q-card class="login-dialog-card">
+        <q-card-section class="text-center q-pa-lg">
+          <q-icon name="person" size="4rem" color="primary" class="q-mb-lg" />
+          <div class="text-h5 text-weight-bold q-mb-md">Connexion requise</div>
+          <div class="text-body1 text-grey-7 q-mb-lg">
+            Vous devez être connecté pour effectuer cette action
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="center" class="q-pa-lg q-pt-none">
+          <q-btn
+            unelevated
+            label="Refuser"
+            color="negative"
+            text-color="white"
+            @click="showLoginDialog = false"
+            class="q-mr-sm q-px-xl"
+          />
+          <q-btn color="primary" label="Se connecter" @click="goToLogin" class="q-px-xl" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { showsApi, type BetaSeriesShow, type BetaSeriesEpisode } from '../services/betaseries-api';
+import axios from 'axios';
+import {
+  showsApi,
+  memberApi,
+  type BetaSeriesShow,
+  type BetaSeriesEpisode,
+} from '../services/betaseries-api';
+import { useAuthStore } from '../stores/auth-store';
+
+const BETA_SERIES_CONFIG = {
+  clientId: process.env.VITE_BETASERIES_CLIENT_ID || '',
+};
 
 interface ProcessedEpisode {
   id: string;
@@ -405,16 +514,30 @@ interface ProcessedEpisode {
   length?: number | undefined;
   rating?: number | undefined;
   isError?: boolean;
+  seen?: boolean;
+  user?: {
+    seen: boolean;
+    note?: number;
+  };
 }
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 
 const show = ref<BetaSeriesShow | null>(null);
 const isLoading = ref(false);
 const expandedSeason = ref<number | null>(null);
 const seasonEpisodes = ref<Record<number, ProcessedEpisode[]>>({});
 const loadingEpisodes = ref<Record<number, boolean>>({});
+const loadingEpisodeActions = ref<Record<string, boolean>>({});
+const markingAllAsWatched = ref(false);
+const togglingFollow = ref(false);
+const isFollowing = ref(false);
+const followFeatureEnabled = ref(false);
+const showLoginDialog = ref(false);
+const isFavorite = ref(false);
+const togglingFavorite = ref(false);
 const latestEpisode = ref<ProcessedEpisode | null>(null);
 const nextEpisode = ref<ProcessedEpisode | null>(null);
 const loadingLatestNext = ref(false);
@@ -427,6 +550,30 @@ const hasValidNextEpisode = computed(() => {
     nextEpisode.value.title &&
     nextEpisode.value.title !== 'Épisode undefined'
   );
+});
+
+const allEpisodesWatched = computed(() => {
+  if (!show.value?.seasons_details) return false;
+
+  let hasLoadedEpisodes = false;
+  let allWatched = true;
+
+  for (const season of show.value.seasons_details) {
+    const episodes = seasonEpisodes.value[season.number] || [];
+
+    if (episodes.length > 0) {
+      hasLoadedEpisodes = true;
+      const validEpisodes = episodes.filter((ep) => !ep.isError && !isEpisodeUpcoming(ep));
+      const watchedEpisodes = validEpisodes.filter((ep) => ep.user?.seen || ep.seen);
+
+      if (validEpisodes.length > 0 && watchedEpisodes.length !== validEpisodes.length) {
+        allWatched = false;
+        break;
+      }
+    }
+  }
+
+  return hasLoadedEpisodes && allWatched;
 });
 
 const loadShowDetails = async () => {
@@ -454,6 +601,19 @@ const loadShowDetails = async () => {
     }
 
     await loadLatestAndNextEpisodes();
+
+    if (authStore.isAuthenticated) {
+      await checkFollowStatus();
+    }
+
+    if (show.value?.seasons_details && show.value.seasons_details.length > 0) {
+      const seasonPromises = show.value.seasons_details.map(async (season) => {
+        if (!seasonEpisodes.value[season.number]) {
+          await loadSeasonEpisodes(season.number);
+        }
+      });
+      await Promise.allSettled(seasonPromises);
+    }
   } catch (error) {
     console.error('Erreur lors du chargement de la série:', error);
     show.value = null;
@@ -605,7 +765,13 @@ const loadSeasonEpisodes = async (seasonNumber: number) => {
   loadingEpisodes.value[seasonNumber] = true;
 
   try {
-    const response = await showsApi.getSeasonEpisodes(show.value.id, seasonNumber);
+    let response;
+    if (authStore.token) {
+      response = await memberApi.getSeasonEpisodes(authStore.token, show.value.id, seasonNumber);
+    } else {
+      response = await showsApi.getSeasonEpisodes(show.value.id, seasonNumber);
+    }
+
     const episodes: ProcessedEpisode[] = response.episodes.map((episode: BetaSeriesEpisode) => ({
       id: episode.id,
       episode: episode.episode,
@@ -616,6 +782,8 @@ const loadSeasonEpisodes = async (seasonNumber: number) => {
       description: episode.description,
       length: episode.length,
       rating: episode.rating,
+      seen: episode.seen || false,
+      user: episode.user || { seen: false },
     }));
 
     seasonEpisodes.value[seasonNumber] = episodes;
@@ -705,6 +873,319 @@ const loadLatestAndNextEpisodes = async () => {
   } finally {
     loadingLatestNext.value = false;
   }
+};
+
+const markEpisodeAsWatched = async (episodeId: string) => {
+  if (!authStore.isAuthenticated) {
+    showLoginDialog.value = true;
+    return;
+  }
+
+  loadingEpisodeActions.value[episodeId] = true;
+
+  try {
+    await memberApi.markEpisodeAsWatched(authStore.token!, episodeId);
+
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => {
+        Object.keys(seasonEpisodes.value).forEach((seasonNumber) => {
+          const episodes = seasonEpisodes.value[parseInt(seasonNumber)];
+          if (episodes) {
+            const episodeIndex = episodes.findIndex((ep) => ep.id === episodeId);
+            if (episodeIndex !== -1) {
+              const episode = episodes[episodeIndex];
+              if (episode) {
+                episode.user = { seen: true };
+                episode.seen = true;
+              }
+            }
+          }
+        });
+        resolve(void 0);
+      }),
+    );
+  } catch (error) {
+    console.error("Erreur lors du marquage de l'épisode comme vu:", error);
+  } finally {
+    loadingEpisodeActions.value[episodeId] = false;
+  }
+};
+
+const markEpisodeAsUnwatched = async (episodeId: string) => {
+  if (!authStore.isAuthenticated) {
+    showLoginDialog.value = true;
+    return;
+  }
+
+  loadingEpisodeActions.value[episodeId] = true;
+
+  try {
+    await memberApi.markEpisodeAsUnwatched(authStore.token!, episodeId);
+
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => {
+        Object.keys(seasonEpisodes.value).forEach((seasonNumber) => {
+          const episodes = seasonEpisodes.value[parseInt(seasonNumber)];
+          if (episodes) {
+            const episodeIndex = episodes.findIndex((ep) => ep.id === episodeId);
+            if (episodeIndex !== -1) {
+              const episode = episodes[episodeIndex];
+              if (episode) {
+                episode.user = { seen: false };
+                episode.seen = false;
+              }
+            }
+          }
+        });
+        resolve(void 0);
+      }),
+    );
+  } catch (error) {
+    console.error("Erreur lors du marquage de l'épisode comme non vu:", error);
+  } finally {
+    loadingEpisodeActions.value[episodeId] = false;
+  }
+};
+
+const markAllEpisodesAsWatched = async () => {
+  if (!authStore.isAuthenticated) {
+    showLoginDialog.value = true;
+    return;
+  }
+
+  if (!show.value) {
+    console.error('Série non chargée');
+    return;
+  }
+
+  markingAllAsWatched.value = true;
+
+  try {
+    const seasonPromises = (show.value.seasons_details || []).map(async (season) => {
+      if (!seasonEpisodes.value[season.number]) {
+        await loadSeasonEpisodes(season.number);
+      }
+      return seasonEpisodes.value[season.number] || [];
+    });
+
+    const seasonResults = await Promise.allSettled(seasonPromises);
+    const allEpisodes: ProcessedEpisode[] = [];
+
+    seasonResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        allEpisodes.push(...result.value.filter((ep) => !ep.isError && !isEpisodeUpcoming(ep)));
+      }
+    });
+
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    if (allEpisodesWatched.value) {
+      const promises = allEpisodes.map((episode) =>
+        memberApi.markEpisodeAsUnwatched(authStore.token!, episode.id),
+      );
+
+      await Promise.allSettled(promises);
+
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => {
+          allEpisodes.forEach((episode) => {
+            episode.user = { seen: false };
+            episode.seen = false;
+          });
+          resolve(void 0);
+        }),
+      );
+    } else {
+      const promises = allEpisodes.map((episode) =>
+        memberApi.markEpisodeAsWatched(authStore.token!, episode.id),
+      );
+
+      await Promise.allSettled(promises);
+
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => {
+          allEpisodes.forEach((episode) => {
+            episode.user = { seen: true };
+            episode.seen = true;
+          });
+          resolve(void 0);
+        }),
+      );
+    }
+  } catch (error) {
+    console.error('Erreur lors du marquage des épisodes:', error);
+  } finally {
+    markingAllAsWatched.value = false;
+  }
+};
+
+const checkFollowStatus = async () => {
+  if (!authStore.token || !show.value?.id) return;
+
+  followFeatureEnabled.value = true;
+
+  try {
+    const { data } = await axios.get('https://api.betaseries.com/shows/member', {
+      params: { locale: 'fr' },
+      headers: {
+        'X-BetaSeries-Key': BETA_SERIES_CONFIG.clientId,
+        'X-BetaSeries-Token': authStore.token,
+      },
+    });
+
+    const isShowFollowed = data.shows?.some(
+      (followedShow: { id: string | number }) =>
+        followedShow.id === show.value?.id || followedShow.id === show.value?.id?.toString(),
+    );
+
+    isFollowing.value = isShowFollowed || false;
+  } catch (error) {
+    isFollowing.value = false;
+  }
+};
+
+const toggleFollowShow = async () => {
+  if (!authStore.isAuthenticated) {
+    showLoginDialog.value = true;
+    return;
+  }
+
+  if (!show.value?.id) {
+    console.error('Série non chargée');
+    return;
+  }
+
+  togglingFollow.value = true;
+
+  try {
+    if (isFollowing.value) {
+      await axios.delete(`https://api.betaseries.com/shows/show?id=${show.value.id}&locale=fr`, {
+        headers: {
+          'X-BetaSeries-Key': BETA_SERIES_CONFIG.clientId,
+          'X-BetaSeries-Token': authStore.token,
+        },
+      });
+    } else {
+      await axios.post(
+        'https://api.betaseries.com/shows/show',
+        {
+          id: show.value.id,
+          locale: 'fr',
+        },
+        {
+          headers: {
+            'X-BetaSeries-Key': BETA_SERIES_CONFIG.clientId,
+            'X-BetaSeries-Token': authStore.token,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        },
+      );
+    }
+
+    isFollowing.value = !isFollowing.value;
+    if (show.value) {
+      show.value.following = isFollowing.value ? '1' : '0';
+    }
+
+    if (isFollowing.value) {
+      await checkFavoriteStatus();
+    } else {
+      isFavorite.value = false;
+    }
+
+    if (authStore.user?.stats) {
+      if (isFollowing.value) {
+        authStore.user.stats.shows = (authStore.user.stats.shows || 0) + 1;
+      } else {
+        authStore.user.stats.shows = Math.max((authStore.user.stats.shows || 0) - 1, 0);
+      }
+    }
+  } catch (error) {
+    await checkFollowStatus();
+  } finally {
+    togglingFollow.value = false;
+  }
+};
+
+const checkFavoriteStatus = async () => {
+  if (!authStore.isAuthenticated || !show.value?.id) return;
+
+  try {
+    const response = await memberApi.getFavoriteShows(authStore.token!);
+
+    isFavorite.value =
+      response.shows?.some((favShow: { id: string | number }) => favShow.id === show.value?.id) ||
+      false;
+  } catch (error: unknown) {
+    console.error('Erreur lors de la vérification des favoris:', error);
+    console.log(
+      "Détails de l'erreur:",
+      (error as { response?: { data?: unknown } })?.response?.data,
+    );
+    isFavorite.value = false;
+  }
+};
+
+const toggleFavoriteShow = async () => {
+  if (!authStore.isAuthenticated) {
+    showLoginDialog.value = true;
+    return;
+  }
+
+  if (!show.value?.id) {
+    console.error('Série non chargée');
+    return;
+  }
+
+  togglingFavorite.value = true;
+
+  try {
+    if (isFavorite.value) {
+      await memberApi.removeFavoriteShow(authStore.token!, show.value.id);
+      isFavorite.value = false;
+    } else {
+      await memberApi.addFavoriteShow(authStore.token!, show.value.id);
+      isFavorite.value = true;
+    }
+  } catch (error) {
+    console.error('Erreur lors du changement de statut favori:', error);
+  } finally {
+    togglingFavorite.value = false;
+  }
+};
+
+watch(
+  show,
+  (newShow) => {
+    if (newShow?.seasons_details && newShow.seasons_details.length > 0) {
+      newShow.seasons_details.forEach((season) => {
+        if (!seasonEpisodes.value[season.number]) {
+          loadSeasonEpisodes(season.number).catch(console.error);
+        }
+      });
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  [isFollowing, () => authStore.isAuthenticated],
+  ([newIsFollowing, isAuth]) => {
+    if (newIsFollowing && isAuth) {
+      void checkFavoriteStatus();
+    } else if (!newIsFollowing) {
+      isFavorite.value = false;
+    }
+  },
+  { immediate: true },
+);
+
+const goToLogin = () => {
+  showLoginDialog.value = false;
+
+  localStorage.setItem('redirect_after_login', route.fullPath);
+
+  authStore.initiateOAuthLogin();
 };
 
 onMounted(() => {
@@ -854,6 +1335,78 @@ export default {
   font-weight: 600;
   color: white;
   font-size: 0.9rem;
+}
+
+.banner-actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.banner-mark-all-btn {
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 12px 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  touch-action: manipulation;
+  will-change: transform, box-shadow;
+}
+
+.banner-mark-all-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.banner-mark-all-btn.all-watched {
+  background-color: #4caf50 !important;
+  color: white !important;
+}
+
+.banner-mark-all-btn.all-watched:hover {
+  background-color: #45a049 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.banner-follow-btn {
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 12px 24px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  touch-action: manipulation;
+  will-change: transform, box-shadow;
+}
+
+.banner-follow-btn * {
+  touch-action: manipulation;
+}
+
+.banner-follow-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.banner-follow-btn.following {
+  background-color: #f44336 !important;
+  color: white !important;
+}
+
+.banner-follow-btn.following:hover {
+  background-color: #d32f2f !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+}
+
+/* Optimisation globale pour les événements tactiles */
+.q-btn {
+  touch-action: manipulation !important;
+}
+
+.q-btn * {
+  touch-action: manipulation !important;
 }
 
 .genre-chip {
@@ -1458,6 +2011,18 @@ export default {
   align-items: center;
 }
 
+.episode-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.episode-actions .q-btn {
+  font-size: 0.75rem;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
 .episode-error {
   border-left: 3px solid #f44336;
   background-color: rgba(244, 67, 54, 0.05);
@@ -1624,5 +2189,37 @@ export default {
     width: 100px;
     height: 150px;
   }
+}
+
+.login-dialog-card {
+  min-width: 400px;
+  max-width: 500px;
+  border-radius: 16px;
+}
+
+.banner-favorite-btn {
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 12px 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  touch-action: manipulation;
+  will-change: transform, box-shadow;
+}
+
+.banner-favorite-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.banner-favorite-btn.favorited {
+  background-color: #ffc107 !important;
+  color: white !important;
+}
+
+.banner-favorite-btn.favorited:hover {
+  background-color: #ffb300 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
 }
 </style>

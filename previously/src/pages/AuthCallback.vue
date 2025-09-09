@@ -34,7 +34,9 @@ onMounted(async () => {
   try {
     await authStore.handleOAuthCallback(code);
 
-    void router.push('/');
+    const redirectUrl = localStorage.getItem('redirect_after_login') || '/';
+    localStorage.removeItem('redirect_after_login');
+    void router.push(redirectUrl);
   } catch (error) {
     console.error("Erreur lors de l'authentification:", error);
 
