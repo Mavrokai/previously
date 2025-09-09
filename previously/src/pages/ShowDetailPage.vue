@@ -460,7 +460,6 @@
       </div>
     </div>
 
-    <!-- Popup de connexion -->
     <q-dialog v-model="showLoginDialog" persistent>
       <q-card class="login-dialog-card">
         <q-card-section class="text-center q-pa-lg">
