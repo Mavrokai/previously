@@ -1118,10 +1118,6 @@ const checkFavoriteStatus = async () => {
       false;
   } catch (error: unknown) {
     console.error('Erreur lors de la vérification des favoris:', error);
-    console.log(
-      "Détails de l'erreur:",
-      (error as { response?: { data?: unknown } })?.response?.data,
-    );
     isFavorite.value = false;
   }
 };

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '../stores/auth-store';
 
 const BETA_SERIES_CONFIG = {
   clientId: import.meta.env.VITE_BETASERIES_CLIENT_ID,
@@ -113,6 +114,34 @@ export interface BetaSeriesMovie {
     name: string;
   }>;
   trailer?: string;
+}
+
+export interface BetaSeriesFriend {
+  id: string;
+  login: string;
+  avatar?: string | undefined;
+  in_account: boolean;
+  stats?:
+    | {
+        shows: number;
+        episodes: number;
+        movies: number;
+      }
+    | undefined;
+}
+
+export interface BetaSeriesMember {
+  id: string;
+  login: string;
+  avatar?: string;
+  in_account: boolean;
+  profile_banner?: string;
+  xp?: number;
+  stats?: {
+    shows: number;
+    episodes: number;
+    movies: number;
+  };
 }
 
 export interface SearchParams {
@@ -512,7 +541,7 @@ export const memberApi = {
     const response = await axios.post(`${BETA_SERIES_CONFIG.baseUrl}/movies/movie`, null, {
       params: {
         id: movieId,
-        state: '1', // 1 = watched
+        state: '1',
         mail: '0',
         twitter: '0',
         profile: '1',
@@ -527,7 +556,7 @@ export const memberApi = {
     const response = await axios.post(`${BETA_SERIES_CONFIG.baseUrl}/movies/movie`, null, {
       params: {
         id: movieId,
-        state: '0', // 0 = to watch (remove from watched)
+        state: '0',
         mail: '0',
         twitter: '0',
         profile: '1',
@@ -558,5 +587,183 @@ export const memberApi = {
       headers: getAuthHeaders(token),
     });
     return response.data;
+  },
+};
+
+export const friendsApi = {
+  async getFriendsList(
+    token: string,
+    params: {
+      id?: string;
+      blocked?: boolean;
+      summary?: boolean;
+      limit?: number;
+      page?: number;
+    } = {},
+  ): Promise<{ friends: BetaSeriesFriend[] }> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/friends/list`, {
+      params: {
+        ...params,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return {
+      friends: response.data.friends || response.data.users || [],
+    };
+  },
+
+  async getFriendRequests(
+    token: string,
+    params: {
+      received?: boolean;
+    } = {},
+  ): Promise<{ friends: BetaSeriesFriend[] }> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/friends/requests`, {
+      params: {
+        ...params,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return {
+      friends: response.data.friends || response.data.users || [],
+    };
+  },
+
+  async addFriend(token: string, memberId: string): Promise<{ friend: BetaSeriesFriend }> {
+    const response = await axios.post(`${BETA_SERIES_CONFIG.baseUrl}/friends/friend`, null, {
+      params: {
+        id: memberId,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return {
+      friend: response.data.friend ||
+        response.data.user || {
+          id: memberId,
+          login: '',
+          in_account: true,
+        },
+    };
+  },
+
+  async removeFriend(token: string, memberId: string): Promise<{ friend: BetaSeriesFriend }> {
+    const response = await axios.delete(`${BETA_SERIES_CONFIG.baseUrl}/friends/friend`, {
+      params: {
+        id: memberId,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return {
+      friend: response.data.friend ||
+        response.data.user || {
+          id: memberId,
+          login: '',
+          in_account: false,
+        },
+    };
+  },
+
+  async blockUser(token: string, memberId: string): Promise<{ friend: BetaSeriesFriend }> {
+    const response = await axios.post(`${BETA_SERIES_CONFIG.baseUrl}/friends/block`, null, {
+      params: {
+        id: memberId,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return {
+      friend: response.data.friend ||
+        response.data.user || {
+          id: memberId,
+          login: '',
+          in_account: false,
+        },
+    };
+  },
+
+  async unblockUser(token: string, memberId: string): Promise<{ friend: BetaSeriesFriend }> {
+    const response = await axios.delete(`${BETA_SERIES_CONFIG.baseUrl}/friends/block`, {
+      params: {
+        id: memberId,
+        locale: 'fr',
+      },
+      headers: getAuthHeaders(token),
+    });
+    return {
+      friend: response.data.friend ||
+        response.data.user || {
+          id: memberId,
+          login: '',
+          in_account: false,
+        },
+    };
+  },
+
+  async searchMembers(params: {
+    login: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ members: BetaSeriesMember[] }> {
+    const authStore = useAuthStore();
+    const headers: Record<string, string> = {
+      'X-BetaSeries-Key': BETA_SERIES_CONFIG.clientId,
+    };
+
+    if (authStore.token) {
+      headers['X-BetaSeries-Token'] = authStore.token;
+    }
+
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/members/search`, {
+      params: {
+        ...params,
+        locale: 'fr',
+      },
+      headers,
+    });
+    return {
+      members: response.data.members || response.data.users || [],
+    };
+  },
+
+  async getMemberInfo(memberId: string): Promise<{ member: BetaSeriesMember }> {
+    const authStore = useAuthStore();
+    const headers: Record<string, string> = {
+      'X-BetaSeries-Key': BETA_SERIES_CONFIG.clientId,
+    };
+
+    if (authStore.token) {
+      headers['X-BetaSeries-Token'] = authStore.token;
+    }
+
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/members/infos`, {
+      params: {
+        id: memberId,
+        locale: 'fr',
+      },
+      headers,
+    });
+    return {
+      member: response.data.member || response.data,
+    };
+  },
+
+  async getPopularMembers(limit: number = 10): Promise<{ members: BetaSeriesMember[] }> {
+    const response = await axios.get(`${BETA_SERIES_CONFIG.baseUrl}/members/search`, {
+      params: {
+        login: 'ab',
+        limit: limit,
+        locale: 'fr',
+      },
+      headers: {
+        'X-BetaSeries-Key': BETA_SERIES_CONFIG.clientId,
+      },
+    });
+    return {
+      members: response.data.members || response.data.users || [],
+    };
   },
 };
