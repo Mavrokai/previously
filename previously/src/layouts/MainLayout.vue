@@ -11,6 +11,7 @@
         <div class="row q-gutter-sm">
           <q-btn flat label="Séries" icon="tv" to="/series" class="text-primary" />
           <q-btn flat label="Films" icon="movie" to="/movies" class="text-primary" />
+          <q-btn flat label="Amis" icon="people" to="/friends" class="text-primary" />
         </div>
 
         <q-space />

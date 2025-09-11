@@ -499,6 +499,110 @@
             </div>
           </div>
         </div>
+
+        <div v-if="currentTab === 'friends'" class="content-tab">
+          <div class="section-header">
+            <h2 class="section-title">
+              <q-icon name="people" class="q-mr-sm" />
+              Amis ({{ friendsStore.friendsCount }})
+            </h2>
+          </div>
+
+          <div class="friends-search-section">
+            <div class="search-container">
+              <q-input
+                v-model="searchQuery"
+                label="Rechercher parmi vos amis"
+                outlined
+                dense
+                class="search-input"
+              >
+                <template v-slot:prepend>
+                  <q-icon name="search" />
+                </template>
+                <template v-slot:append>
+                  <q-icon
+                    v-if="searchQuery"
+                    name="close"
+                    @click="searchQuery = ''"
+                    class="cursor-pointer"
+                  />
+                </template>
+              </q-input>
+            </div>
+          </div>
+
+          <div v-if="friendsStore.isLoading" class="loading-container">
+            <q-spinner-dots size="3rem" color="primary" />
+            <div class="text-h6 text-grey-7 q-mt-md">Chargement des amis...</div>
+          </div>
+
+          <div
+            v-else-if="
+              !friendsStore.friends ||
+              !Array.isArray(friendsStore.friends) ||
+              (friendsStore.friends && friendsStore.friends.length === 0)
+            "
+            class="empty-state"
+          >
+            <q-icon name="people_outline" size="4rem" color="grey-5" class="q-mb-md" />
+            <div class="text-h6 text-grey-7">Aucun ami pour le moment</div>
+            <div class="text-body2 text-grey-6">
+              Recherchez des membres pour les ajouter à vos amis
+            </div>
+          </div>
+
+          <div v-else-if="filteredFriends.length === 0 && searchQuery" class="empty-state">
+            <q-icon name="person_search" size="4rem" color="grey-5" class="q-mb-md" />
+            <div class="text-h6 text-grey-7">Aucun ami trouvé</div>
+            <div class="text-body2 text-grey-6">Essayez avec un autre nom</div>
+          </div>
+
+          <div v-else class="friends-list">
+            <div v-for="friend in filteredFriends" :key="friend.id" class="friend-item">
+              <div class="friend-info">
+                <q-avatar size="50px" class="friend-avatar">
+                  <img v-if="friend.avatar" :src="friend.avatar" :alt="friend.login" />
+                  <q-icon v-else name="person" size="25px" color="grey-5" />
+                </q-avatar>
+                <div class="friend-details">
+                  <div class="friend-login">{{ friend.login }}</div>
+                  <div v-if="friend.stats" class="friend-stats">
+                    <span class="stat-item">
+                      <q-icon name="tv" size="0.8rem" color="primary" class="q-mr-xs" />
+                      {{ friend.stats.shows || 0 }} séries
+                    </span>
+                    <span class="stat-item">
+                      <q-icon name="movie" size="0.8rem" color="primary" class="q-mr-xs" />
+                      {{ friend.stats.movies || 0 }} films
+                    </span>
+                    <span class="stat-item">
+                      <q-icon name="play_circle" size="0.8rem" color="primary" class="q-mr-xs" />
+                      {{ friend.stats.episodes || 0 }} épisodes
+                    </span>
+                    <span class="stat-item">
+                      <q-icon name="favorite" size="0.8rem" color="primary" class="q-mr-xs" />
+                      {{ (friend.stats.movies || 0) + (friend.stats.shows || 0) }} total
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="friend-actions">
+                <q-btn
+                  color="negative"
+                  icon="person_remove"
+                  label="Supprimer"
+                  @click="removeFriend(friend.id)"
+                  :loading="friendsStore.isLoading"
+                  size="sm"
+                  dense
+                  no-caps
+                  outline
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </q-page>
@@ -508,6 +612,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth-store';
+import { useFriendsStore } from '../stores/friends-store';
 import {
   moviesApi,
   memberApi,
@@ -515,10 +620,12 @@ import {
   type BetaSeriesMovie,
   type BetaSeriesShow,
   type BetaSeriesEpisode,
+  type BetaSeriesFriend,
 } from '../services/betaseries-api';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const friendsStore = useFriendsStore();
 
 const isLoading = ref(false);
 const selectedTab = ref<string | { label: string; value: string }>({
@@ -541,10 +648,13 @@ const showEpisodes = ref<Record<string, BetaSeriesEpisode[]>>({});
 const allShowEpisodes = ref<Record<string, BetaSeriesEpisode[]>>({});
 const loadingEpisodeActions = ref<Record<string, boolean>>({});
 
+const searchQuery = ref('');
+
 const tabOptions = [
   { label: 'Films vus', value: 'movies' },
   { label: 'Séries suivies', value: 'shows' },
   { label: 'Favoris', value: 'favorites' },
+  { label: 'Amis', value: 'friends' },
 ];
 
 const currentTab = computed(() => {
@@ -552,6 +662,17 @@ const currentTab = computed(() => {
     return selectedTab.value;
   }
   return selectedTab.value?.value || 'movies';
+});
+
+const filteredFriends = computed(() => {
+  if (!searchQuery.value || searchQuery.value.length < 2) {
+    return friendsStore.friends;
+  }
+
+  const query = searchQuery.value.toLowerCase();
+  return friendsStore.friends.filter((friend: BetaSeriesFriend) =>
+    friend.login.toLowerCase().includes(query),
+  );
 });
 
 const currentSort = computed(() => {
@@ -656,6 +777,24 @@ const loadFavorites = async () => {
   }
 };
 
+const loadFriends = async () => {
+  if (!authStore.token) {
+    console.error("Token d'authentification manquant");
+    return;
+  }
+
+  try {
+    await friendsStore.loadFriends();
+    await friendsStore.loadFriendRequests();
+  } catch (error) {
+    console.error('Erreur lors du chargement des amis:', error);
+  }
+};
+
+const removeFriend = async (memberId: string) => {
+  await friendsStore.removeFriend(memberId);
+};
+
 const refreshData = async () => {
   if (!authStore.isAuthenticated || !authStore.token) {
     console.error('Utilisateur non authentifié');
@@ -674,6 +813,8 @@ const refreshData = async () => {
       await loadWatchedMovies();
     } else if (currentTab.value === 'shows') {
       await loadWatchedShows();
+    } else if (currentTab.value === 'friends') {
+      await loadFriends();
     }
   } catch (error) {
     console.error('Erreur lors du chargement des données:', error);
@@ -1719,6 +1860,204 @@ onMounted(async () => {
   .movie-poster,
   .show-poster {
     height: 220px;
+  }
+}
+
+.friends-search-section {
+  margin-bottom: 30px;
+}
+
+.search-container {
+  margin-bottom: 20px;
+}
+
+.search-input {
+  max-width: 400px;
+}
+
+.search-results {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.search-results-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1976d2;
+  margin: 0 0 15px 0;
+}
+
+.no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.search-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.search-result-item:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.member-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+
+.member-avatar {
+  flex-shrink: 0;
+}
+
+.member-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.member-login {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  font-size: 1rem;
+}
+
+.member-status {
+  display: flex;
+  align-items: center;
+}
+
+.member-actions {
+  flex-shrink: 0;
+}
+
+.friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.friend-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.friend-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.friend-avatar {
+  flex-shrink: 0;
+}
+
+.friend-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-login {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.friend-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.friend-stats .stat-item {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+  background: rgba(25, 118, 210, 0.1);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.friend-actions {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .search-input {
+    max-width: 100%;
+  }
+
+  .search-result-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .member-info {
+    width: 100%;
+  }
+
+  .member-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .friend-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .friend-info {
+    width: 100%;
+  }
+
+  .friend-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .friend-stats {
+    gap: 15px;
   }
 }
 </style>
