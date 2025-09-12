@@ -460,7 +460,6 @@
       </div>
     </div>
 
-    <!-- Popup de connexion -->
     <q-dialog v-model="showLoginDialog" persistent>
       <q-card class="login-dialog-card">
         <q-card-section class="text-center q-pa-lg">
@@ -1396,7 +1395,6 @@ export default {
   box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
 }
 
-/* Optimisation globale pour les événements tactiles */
 .q-btn {
   touch-action: manipulation !important;
 }

@@ -100,16 +100,25 @@
                   disabled
                   size="sm"
                 />
-                <q-btn
-                  v-else
-                  color="negative"
-                  icon="person_remove"
-                  label="Supprimer"
-                  @click="removeFriend(member.id)"
-                  :loading="friendsStore.isLoading"
-                  size="sm"
-                  outline
-                />
+                <div v-else class="column q-gutter-xs">
+                  <q-btn
+                    color="primary"
+                    icon="person"
+                    label="Voir le profil"
+                    @click="viewProfile(member.id)"
+                    size="sm"
+                    outline
+                  />
+                  <q-btn
+                    color="negative"
+                    icon="person_remove"
+                    label="Supprimer"
+                    @click="removeFriend(member.id)"
+                    :loading="friendsStore.isLoading"
+                    size="sm"
+                    outline
+                  />
+                </div>
               </q-card-actions>
             </q-card>
           </div>
@@ -197,16 +206,25 @@
                   disabled
                   size="sm"
                 />
-                <q-btn
-                  v-else
-                  color="negative"
-                  icon="person_remove"
-                  label="Supprimer"
-                  @click="removeFriend(member.id)"
-                  :loading="friendsStore.isLoading"
-                  size="sm"
-                  outline
-                />
+                <div v-else class="column q-gutter-xs">
+                  <q-btn
+                    color="primary"
+                    icon="person"
+                    label="Voir le profil"
+                    @click="viewProfile(member.id)"
+                    size="sm"
+                    outline
+                  />
+                  <q-btn
+                    color="negative"
+                    icon="person_remove"
+                    label="Supprimer"
+                    @click="removeFriend(member.id)"
+                    :loading="friendsStore.isLoading"
+                    size="sm"
+                    outline
+                  />
+                </div>
               </q-card-actions>
             </q-card>
           </div>
@@ -230,10 +248,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth-store';
 import { useFriendsStore } from '../stores/friends-store';
 import type { BetaSeriesMember } from '../services/betaseries-api';
 
+const router = useRouter();
 const authStore = useAuthStore();
 const friendsStore = useFriendsStore();
 
@@ -338,6 +358,10 @@ const addFriend = async (memberId: string) => {
 
 const removeFriend = async (memberId: string) => {
   await friendsStore.removeFriend(memberId);
+};
+
+const viewProfile = (memberId: string) => {
+  void router.push(`/friend/${memberId}`);
 };
 
 onMounted(async () => {

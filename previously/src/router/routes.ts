@@ -49,6 +49,12 @@ const routes: RouteRecordRaw[] = [
     children: [{ path: '', component: () => import('pages/FriendsPage.vue') }],
   },
 
+  {
+    path: '/friend/:id',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{ path: '', component: () => import('pages/FriendProfilePage.vue') }],
+  },
+
   // Always leave this as last one,
   // but you can also remove it
   {
