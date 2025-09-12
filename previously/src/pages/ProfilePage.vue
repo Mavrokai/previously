@@ -589,6 +589,17 @@
               </div>
               <div class="friend-actions">
                 <q-btn
+                  color="primary"
+                  icon="person"
+                  label="Voir le profil"
+                  @click="viewFriendProfile(friend.id)"
+                  size="sm"
+                  dense
+                  no-caps
+                  outline
+                  class="q-mr-sm"
+                />
+                <q-btn
                   color="negative"
                   icon="person_remove"
                   label="Supprimer"
@@ -793,6 +804,10 @@ const loadFriends = async () => {
 
 const removeFriend = async (memberId: string) => {
   await friendsStore.removeFriend(memberId);
+};
+
+const viewFriendProfile = (friendId: string) => {
+  void router.push(`/friend/${friendId}`);
 };
 
 const refreshData = async () => {

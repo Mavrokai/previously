@@ -207,7 +207,6 @@
       <div class="text-h6 text-grey-7">Film non trouvé</div>
     </div>
 
-    <!-- Popup de connexion -->
     <q-dialog v-model="showLoginDialog" persistent>
       <q-card class="login-dialog-card">
         <q-card-section class="text-center q-pa-lg">
